@@ -131,14 +131,14 @@ ddev composer config scripts.test phpunit
 mkdir -p config/sync
 
 # Set config_sync_directory in settings.php
-grep -qF "\$settings['config_sync_directory']" web/sites/default/settings.php || \
+grep -qF '$settings['\''config_sync_directory'\''] = '\''../config/sync'\'';' web/sites/default/settings.php || \
   perl -0pi -e 's|^(\Q// Automatically generated include for settings managed by ddev.\E)|\$settings['\''config_sync_directory'\''] = '\''../config/sync'\'';\n\n$1|m' web/sites/default/settings.php
 
 # Install Drupal
 ddev drush site:install drupal_cms_installer -y --account-name=admin --account-mail=me@example.com '--site-name=Bob'\''s "Site"'
 
 # Set the admin password
-printf '%s\n' "$DRUPAL_ADMIN_PASS" | ddev exec --raw bash -c 'read -r p && drush user:password "$1" "$p"' _ admin
+printf '%s\n' "$DRUPAL_ADMIN_PASS" | ddev exec 'read -r p && drush user:password admin "$p"'
 
 # Add the Redis module
 ddev composer require drupal/redis -n

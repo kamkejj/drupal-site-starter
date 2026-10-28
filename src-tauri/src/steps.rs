@@ -9,13 +9,19 @@ pub const SETTINGS_PHP: &str = "web/sites/default/settings.php";
 pub const DDEV_INCLUDE_MARKER: &str = "// Automatically generated include for settings managed by ddev.";
 pub const PASSWORD_ENV: &str = "DRUPAL_ADMIN_PASS";
 
+pub fn config_sync_line(dir: &str) -> String {
+    format!("$settings['config_sync_directory'] = '{dir}';")
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Action {
     /// `ddev <args>` in the project folder. With `stdin_secret`, the admin
-    /// password is written to stdin so it never appears in argv.
+    /// password is written to stdin so it never appears in argv. Only plain
+    /// `ddev exec` forwards stdin; `ddev exec --raw` does not.
     Ddev { args: Vec<String>, stdin_secret: bool },
     Git { args: Vec<String> },
+    CreateProjectDir,
     Mkdir { path: String },
     WriteFile { path: String, contents: String },
     /// Inserts `config_sync_directory` above the DDEV include in settings.php.
@@ -89,7 +95,7 @@ const MIN: u64 = 60;
 pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     let r = &p.release;
     let mut steps = vec![
-        step("mkdir", "Create the project folder", Action::Mkdir { path: ".".into() }, MIN),
+        step("mkdir", "Create the project folder", Action::CreateProjectDir, MIN),
         step(
             "ddev-config",
             "Configure DDEV",
@@ -207,7 +213,7 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
             Action::SetConfigSyncDir { dir: p.config_sync_dir.clone() },
             MIN,
         )
-        .check(contains(SETTINGS_PHP, "$settings['config_sync_directory']")),
+        .check(contains(SETTINGS_PHP, &config_sync_line(&p.config_sync_dir))),
     );
 
     steps.push(
@@ -231,9 +237,10 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
         "admin-password",
         "Set the admin password",
         Action::Ddev {
-            args: ["exec", "--raw", "bash", "-c", "read -r p && drush user:password \"$1\" \"$p\"", "_", &p.admin_name]
-                .map(String::from)
-                .to_vec(),
+            args: vec![
+                "exec".into(),
+                format!("read -r p && drush user:password {} \"$p\"", crate::script::quote(&p.admin_name)),
+            ],
             stdin_secret: true,
         },
         5 * MIN,

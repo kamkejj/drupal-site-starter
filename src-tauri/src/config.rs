@@ -235,6 +235,15 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn deserializes_the_payload_the_wizard_sends() {
+        let tmp = tempfile::tempdir().unwrap();
+        let payload = r#"{"name":"acme-intranet","parentDir":"PARENT","drupal":"11","php":"8.3","webserver":"nginx-fpm","database":{"type":"postgres","version":"17"},"services":["mailpit","adminer","redis"],"adminName":"admin","adminEmail":"admin@example.com","siteName":"Acme Intranet","configSyncDir":"../config/sync","exportConfigOnInstall":true,"initGit":true}"#
+            .replace("PARENT", &tmp.path().display().to_string());
+        let input: ProjectInput = serde_json::from_str(&payload).unwrap();
+        assert!(parse(&input, &Compat::bundled()).is_ok());
+    }
+
+    #[test]
     fn machine_name_follows_hostname_rules() {
         assert_eq!(machine_name("  My Cool Site! "), "my-cool-site");
         assert_eq!(machine_name("Ünïcode__Site--2"), "n-code-site-2");

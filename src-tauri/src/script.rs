@@ -1,5 +1,5 @@
 use crate::config::Project;
-use crate::steps::{Action, Step, DDEV_INCLUDE_MARKER, PASSWORD_ENV, SETTINGS_PHP};
+use crate::steps::{config_sync_line, Action, Step, DDEV_INCLUDE_MARKER, PASSWORD_ENV, SETTINGS_PHP};
 
 pub fn quote(s: &str) -> String {
     let plain = !s.is_empty()
@@ -16,7 +16,7 @@ fn command(program: &str, args: &[String]) -> String {
 
 fn render_action(action: &Action, p: &Project) -> String {
     match action {
-        Action::Mkdir { path } if path == "." => {
+        Action::CreateProjectDir => {
             format!("mkdir -p {name}\ncd {name}", name = quote(&p.name))
         }
         Action::Ddev { args, stdin_secret: false } => command("ddev", args),
@@ -34,10 +34,11 @@ fn render_action(action: &Action, p: &Project) -> String {
             format!("{mkdir}cat > {} <<'DDEV_CREATOR_EOF'\n{}DDEV_CREATOR_EOF", quote(path), contents)
         }
         Action::SetConfigSyncDir { dir } => {
-            let line = format!("$settings['config_sync_directory'] = '{dir}';");
+            let line = config_sync_line(dir);
             format!(
-                "grep -qF \"\\$settings['config_sync_directory']\" {SETTINGS_PHP} || \\\n  \
+                "grep -qF {} {SETTINGS_PHP} || \\\n  \
                  perl -0pi -e 's|^(\\Q{DDEV_INCLUDE_MARKER}\\E)|{}\\n\\n$1|m' {SETTINGS_PHP}",
+                quote(&line),
                 line.replace('$', "\\$").replace('\'', "'\\''"),
             )
         }

@@ -94,6 +94,15 @@ async fn existing_projects(state: State<'_, AppState>) -> Result<Vec<String>, St
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn project_url(state: State<'_, AppState>, name: String) -> Result<String, String> {
+    let path = state.exec.path.clone();
+    let fallback = format!("https://{name}.ddev.site");
+    tauri::async_runtime::spawn_blocking(move || preflight::project_url(&path, &name).unwrap_or(fallback))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Plan {
@@ -228,6 +237,7 @@ pub fn run() {
             save_settings,
             preflight,
             existing_projects,
+            project_url,
             plan_project,
             export_script,
             start_run,

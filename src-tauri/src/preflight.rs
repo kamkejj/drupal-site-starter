@@ -61,6 +61,12 @@ pub fn existing_projects(path: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// DDEV moves to other ports when 80/443 are taken, so ask it for the real URL.
+pub fn project_url(path: &str, name: &str) -> Option<String> {
+    let json: serde_json::Value = serde_json::from_str(&output(path, "ddev", &["describe", "-j", name])?).ok()?;
+    json["raw"]["primary_url"].as_str().map(str::to_string)
+}
+
 fn port_free(port: u16) -> bool {
     TcpListener::bind(("127.0.0.1", port)).is_ok()
 }
@@ -109,7 +115,7 @@ pub fn run(path: &str, compat: &Compat, projects_dir: &Path) -> Vec<CheckResult>
     checks.push(if busy.is_empty() {
         result("ports", "Ports 80 and 443", Level::Ok, "free")
     } else {
-        result("ports", "Ports 80 and 443", Level::Warn, format!("Port {} in use. That's fine if it is the DDEV router.", busy.join(" and ")))
+        result("ports", "Ports 80 and 443", Level::Warn, format!("Port {} in use. Fine if it's the DDEV router; otherwise DDEV serves sites on other ports, such as :30001.", busy.join(" and ")))
     });
 
     checks.push(match free_gib(projects_dir, path) {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "drupal-ddev-creator",
+  "productName": "Drupal DDEV Site Creator",
   "version": "0.1.0",
   "identifier": "dev.spinup.drupal",
   "build": {
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "drupal-ddev-creator",
-        "width": 800,
-        "height": 600
+        "title": "Drupal DDEV Site Creator",
+        "width": 1100,
+        "height": 780,
+        "minWidth": 820,
+        "minHeight": 600
       }
     ],
     "security": {

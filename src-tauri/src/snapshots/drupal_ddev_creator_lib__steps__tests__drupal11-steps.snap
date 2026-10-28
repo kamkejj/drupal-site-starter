@@ -2,7 +2,7 @@
 source: src/steps.rs
 expression: summary(&steps)
 ---
-mkdir: {"kind":"mkdir","path":"."}
+mkdir: {"kind":"createProjectDir"}
 ddev-config: {"kind":"ddev","args":["config","--project-name=mysite","--project-type=drupal11","--docroot=web","--php-version=8.3","--webserver-type=nginx-fpm","--database=mariadb:10.11"],"stdin_secret":false}
 ddev-start: {"kind":"ddev","args":["start"],"stdin_secret":false}
 create-project: {"kind":"ddev","args":["composer","create-project","drupal/recommended-project:^11","-n"],"stdin_secret":false}
@@ -25,7 +25,7 @@ script:test: {"kind":"ddev","args":["composer","config","scripts.test","phpunit"
 mkdir-config-sync: {"kind":"mkdir","path":"config/sync"}
 settings-config-sync: {"kind":"setConfigSyncDir","dir":"../config/sync"}
 site-install: {"kind":"ddev","args":["drush","site:install","standard","-y","--account-name=admin","--account-mail=me@example.com","--site-name=My Site"],"stdin_secret":false}
-admin-password: {"kind":"ddev","args":["exec","--raw","bash","-c","read -r p && drush user:password \"$1\" \"$p\"","_","admin"],"stdin_secret":true}
+admin-password: {"kind":"ddev","args":["exec","read -r p && drush user:password admin \"$p\""],"stdin_secret":true}
 config-export: {"kind":"ddev","args":["drush","config:export","-y"],"stdin_secret":false}
 write:.gitignore: write .gitignore
 git-init: {"kind":"git","args":["init","-q"]}

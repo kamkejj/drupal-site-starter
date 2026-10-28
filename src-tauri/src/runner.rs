@@ -1,4 +1,4 @@
-use crate::steps::{Action, Check, Retry, Step, DDEV_INCLUDE_MARKER, SETTINGS_PHP};
+use crate::steps::{config_sync_line, Action, Check, Retry, Step, DDEV_INCLUDE_MARKER, SETTINGS_PHP};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
@@ -176,8 +176,7 @@ pub fn insert_config_sync_dir(settings: &str, dir: &str) -> Result<String, Strin
     let at = settings
         .find(DDEV_INCLUDE_MARKER)
         .ok_or_else(|| format!("{SETTINGS_PHP} has no DDEV include to insert above."))?;
-    let line = format!("$settings['config_sync_directory'] = '{dir}';\n\n");
-    Ok(format!("{}{line}{}", &settings[..at], &settings[at..]))
+    Ok(format!("{}{}\n\n{}", &settings[..at], config_sync_line(dir), &settings[at..]))
 }
 
 impl<E: Executor> Run<'_, E> {
@@ -194,6 +193,9 @@ impl<E: Executor> Run<'_, E> {
                 command("ddev", args, stdin_secret.then(|| self.secret.0.clone()))
             }
             Action::Git { args } => command("git", args, None),
+            Action::CreateProjectDir => {
+                return std::fs::create_dir_all(self.dir).map_err(|e| e.to_string());
+            }
             Action::Mkdir { path } => {
                 return std::fs::create_dir_all(self.dir.join(path)).map_err(|e| e.to_string());
             }
@@ -352,5 +354,36 @@ pub(crate) mod tests {
         let sync = out.find("$settings['config_sync_directory'] = '../config/sync';").unwrap();
         assert!(sync < out.find(DDEV_INCLUDE_MARKER).unwrap());
         assert!(insert_config_sync_dir("<?php\n", "x").is_err());
+    }
+}
+
+/// Real DDEV run. `SMOKE_PARENT=/some/dir SMOKE_DRUPAL=11 cargo test smoke -- --ignored --nocapture`
+#[cfg(test)]
+mod smoke {
+    use super::*;
+    use crate::compat::Compat;
+    use crate::config::{parse, tests::input};
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn smoke_creates_a_real_site() {
+        let parent = PathBuf::from(std::env::var("SMOKE_PARENT").expect("SMOKE_PARENT"));
+        let mut i = input(&parent);
+        i.drupal = std::env::var("SMOKE_DRUPAL").unwrap_or_else(|_| "11".into());
+        i.name = format!("ddevcreator-smoke-{}", i.drupal);
+        i.services = vec!["mailpit".into(), "adminer".into(), "redis".into()];
+        let compat = Compat::bundled();
+        let p = parse(&i, &compat).unwrap();
+        let steps = crate::steps::build(&p, &compat);
+        let exec = NativeExecutor { path: crate::env::login_shell_path() };
+        let (_tx, cancel) = watch::channel(false);
+        let secret = Secret("smoke-pass-123".into());
+        let state_path = parent.join(format!("{}.state.json", p.name));
+        let run = Run { exec: &exec, dir: &p.dir, steps: &steps, secret: &secret, state_path: &state_path, cancel };
+        let emit = |e: RunEvent| match e {
+            RunEvent::Log { id, line } => println!("[{id}] {line}"),
+            other => println!("== {}", serde_json::to_string(&other).unwrap()),
+        };
+        assert!(run.execute(&emit).await, "run succeeded");
     }
 }
