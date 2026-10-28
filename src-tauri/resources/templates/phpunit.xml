@@ -7,8 +7,8 @@
   <php>
     <ini name="error_reporting" value="32767"/>
     <ini name="memory_limit" value="-1"/>
-    <env name="SIMPLETEST_BASE_URL" value="http://web"/>
-    <env name="SIMPLETEST_DB" value="{{SIMPLETEST_DB}}"/>
+    <env name="SIMPLETEST_BASE_URL" value="http://web" force="true"/>
+    <env name="SIMPLETEST_DB" value="{{SIMPLETEST_DB}}" force="true"/>
     <env name="BROWSERTEST_OUTPUT_DIRECTORY" value="web/sites/simpletest/browser_output"/>
   </php>
   <testsuites>

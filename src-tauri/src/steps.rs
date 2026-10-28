@@ -285,7 +285,7 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     ));
 
     for s in &p.services {
-        if let Wiring::Module { packages, modules } = &s.wiring {
+        if let Wiring::Module { packages, modules, setup } = &s.wiring {
             let mut require = vec!["composer", "require"];
             require.extend(packages.iter().map(String::as_str));
             require.push("-n");
@@ -294,6 +294,12 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
             let mut enable = vec!["drush", "pm:enable", "-y"];
             enable.extend(modules.iter().map(String::as_str));
             steps.push(step(format!("wire:{}:enable", s.id), format!("Enable the {} module", s.label), ddev(&enable), 5 * MIN));
+
+            for (n, cmd) in setup.iter().enumerate() {
+                let mut args = vec!["drush"];
+                args.extend(cmd.drush.iter().map(String::as_str));
+                steps.push(step(format!("wire:{}:setup:{n}", s.id), cmd.title.clone(), ddev(&args), 5 * MIN));
+            }
         }
     }
 

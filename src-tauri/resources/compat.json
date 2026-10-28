@@ -102,7 +102,21 @@
       "id": "solr",
       "label": "Solr",
       "addon": "ddev/ddev-solr",
-      "wiring": { "kind": "module", "packages": ["drupal/search_api_solr"], "modules": ["search_api_solr"] },
+      "wiring": {
+        "kind": "module",
+        "packages": ["drupal/search_api_solr"],
+        "modules": ["search_api_solr", "search_api_solr_admin"],
+        "setup": [
+          {
+            "title": "Create the Solr search server",
+            "drush": ["php:eval", "$id = 'solr'; if (!\\Drupal\\search_api\\Entity\\Server::load($id)) { \\Drupal\\search_api\\Entity\\Server::create(['id' => $id, 'name' => 'Solr', 'backend' => 'search_api_solr', 'backend_config' => ['connector' => 'solr_cloud_basic_auth', 'connector_config' => ['scheme' => 'http', 'host' => 'solr', 'port' => 8983, 'path' => '/', 'core' => 'drupal', 'context' => 'solr', 'distrib' => TRUE, 'username' => 'solr', 'password' => 'SolrRocks']]])->save(); }"]
+          },
+          {
+            "title": "Upload the Solr configset",
+            "drush": ["search-api-solr:upload-configset", "--numShards=1", "solr"]
+          }
+        ]
+      },
       "defaultOn": false
     },
     { "id": "elasticsearch", "label": "Elasticsearch", "addon": "ddev/ddev-elasticsearch", "wiring": { "kind": "containerOnly" }, "defaultOn": false },

@@ -31,5 +31,7 @@ admin-password: {"kind":"ddev","args":["exec","read -r p && drush user:password 
 wire:redis:require: {"kind":"ddev","args":["composer","require","drupal/redis","-n"],"stdin_secret":false}
 wire:redis:enable: {"kind":"ddev","args":["drush","pm:enable","-y","redis"],"stdin_secret":false}
 wire:solr:require: {"kind":"ddev","args":["composer","require","drupal/search_api_solr","-n"],"stdin_secret":false}
-wire:solr:enable: {"kind":"ddev","args":["drush","pm:enable","-y","search_api_solr"],"stdin_secret":false}
+wire:solr:enable: {"kind":"ddev","args":["drush","pm:enable","-y","search_api_solr","search_api_solr_admin"],"stdin_secret":false}
+wire:solr:setup:0: {"kind":"ddev","args":["drush","php:eval","$id = 'solr'; if (!\\Drupal\\search_api\\Entity\\Server::load($id)) { \\Drupal\\search_api\\Entity\\Server::create(['id' => $id, 'name' => 'Solr', 'backend' => 'search_api_solr', 'backend_config' => ['connector' => 'solr_cloud_basic_auth', 'connector_config' => ['scheme' => 'http', 'host' => 'solr', 'port' => 8983, 'path' => '/', 'core' => 'drupal', 'context' => 'solr', 'distrib' => TRUE, 'username' => 'solr', 'password' => 'SolrRocks']]])->save(); }"],"stdin_secret":false}
+wire:solr:setup:1: {"kind":"ddev","args":["drush","search-api-solr:upload-configset","--numShards=1","solr"],"stdin_secret":false}
 htaccess: {"kind":"ddev","args":["drush","php:eval","\\Drupal::service('file.htaccess_writer')->ensure();"],"stdin_secret":false}

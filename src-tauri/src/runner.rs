@@ -374,7 +374,13 @@ mod smoke {
         let compat = Compat::bundled();
         let release = compat.release(&i.drupal).expect("SMOKE_DRUPAL names a release");
         i.php = release.default_php.clone();
-        i.database = release.default_database.clone();
+        i.database = match std::env::var("SMOKE_DB") {
+            Ok(db) => {
+                let (kind, version) = db.split_once(':').expect("SMOKE_DB is type:version");
+                serde_json::from_value(serde_json::json!({ "type": kind, "version": version })).expect("valid SMOKE_DB")
+            }
+            Err(_) => release.default_database.clone(),
+        };
         i.services = std::env::var("SMOKE_SERVICES")
             .unwrap_or_else(|_| "mailpit,adminer,redis".into())
             .split(',')

@@ -28,7 +28,7 @@ export type DrupalRelease = {
 export type Wiring =
   | { kind: "none" }
   | { kind: "containerOnly" }
-  | { kind: "module"; packages: string[]; modules: string[] };
+  | { kind: "module"; packages: string[]; modules: string[]; setup: { title: string; drush: string[] }[] };
 
 export type Service = {
   id: string;

@@ -91,8 +91,8 @@ cat > phpunit.xml <<'DDEV_CREATOR_EOF'
   <php>
     <ini name="error_reporting" value="32767"/>
     <ini name="memory_limit" value="-1"/>
-    <env name="SIMPLETEST_BASE_URL" value="http://web"/>
-    <env name="SIMPLETEST_DB" value="pgsql://db:db@db/db"/>
+    <env name="SIMPLETEST_BASE_URL" value="http://web" force="true"/>
+    <env name="SIMPLETEST_DB" value="pgsql://db:db@db/db" force="true"/>
     <env name="BROWSERTEST_OUTPUT_DIRECTORY" value="web/sites/simpletest/browser_output"/>
   </php>
   <testsuites>
@@ -150,7 +150,13 @@ ddev drush pm:enable -y redis
 ddev composer require drupal/search_api_solr -n
 
 # Enable the Solr module
-ddev drush pm:enable -y search_api_solr
+ddev drush pm:enable -y search_api_solr search_api_solr_admin
+
+# Create the Solr search server
+ddev drush php:eval '$id = '\''solr'\''; if (!\Drupal\search_api\Entity\Server::load($id)) { \Drupal\search_api\Entity\Server::create(['\''id'\'' => $id, '\''name'\'' => '\''Solr'\'', '\''backend'\'' => '\''search_api_solr'\'', '\''backend_config'\'' => ['\''connector'\'' => '\''solr_cloud_basic_auth'\'', '\''connector_config'\'' => ['\''scheme'\'' => '\''http'\'', '\''host'\'' => '\''solr'\'', '\''port'\'' => 8983, '\''path'\'' => '\''/'\'', '\''core'\'' => '\''drupal'\'', '\''context'\'' => '\''solr'\'', '\''distrib'\'' => TRUE, '\''username'\'' => '\''solr'\'', '\''password'\'' => '\''SolrRocks'\'']]])->save(); }'
+
+# Upload the Solr configset
+ddev drush search-api-solr:upload-configset --numShards=1 solr
 
 # Write protective .htaccess files
 ddev drush php:eval '\Drupal::service('\''file.htaccess_writer'\'')->ensure();'

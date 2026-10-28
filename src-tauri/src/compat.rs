@@ -65,7 +65,20 @@ pub struct DrupalRelease {
 pub enum Wiring {
     None,
     ContainerOnly,
-    Module { packages: Vec<String>, modules: Vec<String> },
+    /// `setup` runs after the modules are enabled, for wiring a module alone
+    /// can't do, such as creating a Search API server.
+    Module {
+        packages: Vec<String>,
+        modules: Vec<String>,
+        #[serde(default)]
+        setup: Vec<SetupCommand>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetupCommand {
+    pub title: String,
+    pub drush: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
