@@ -10,6 +10,7 @@
     type DbType,
     type FieldError,
     type Plan,
+    type Preset,
     type ProjectInput,
   } from "$lib/api";
 
@@ -63,6 +64,50 @@
     exportConfigOnInstall: true,
     initGit: true,
   });
+
+  let presets = $state<Preset[]>([]);
+  let presetName = $state("");
+  let presetNote = $state("");
+  let newPresetName = $state("");
+  const activePreset = $derived(presets.find((p) => p.name === presetName));
+
+  api.listPresets().then((p) => (presets = p));
+
+  function applyPreset(name: string) {
+    presetName = name;
+    presetNote = "";
+    const p = presets.find((x) => x.name === name);
+    if (!p) return;
+    const r = compat.drupal.find((d) => d.id === p.drupal);
+    if (!r) {
+      presetNote = `${p.name} uses Drupal "${p.drupal}", which this version of the app doesn't offer.`;
+      return;
+    }
+    const phpOk = r.php.includes(p.php);
+    const dbOk = r.databases[p.database.type]?.includes(p.database.version) ?? false;
+    input.drupal = r.id;
+    input.php = phpOk ? p.php : r.defaultPhp;
+    input.database = dbOk ? { ...p.database } : { ...r.defaultDatabase };
+    input.webserver = p.webserver;
+    input.services = p.services.filter((id) => compat.services.some((s) => s.id === id));
+    input.configSyncDir = p.configSyncDir;
+    input.exportConfigOnInstall = p.exportConfigOnInstall;
+    input.initGit = p.initGit;
+    if (!phpOk || !dbOk) presetNote = `${r.label} no longer supports some of this preset's versions, so the defaults are used instead.`;
+  }
+
+  async function savePreset() {
+    const { drupal, php, webserver, database, services, configSyncDir, exportConfigOnInstall, initGit } = $state.snapshot(input);
+    const name = newPresetName.trim();
+    try {
+      presets = await api.savePreset({ name, drupal, php, webserver, database, services, configSyncDir, exportConfigOnInstall, initGit });
+      presetName = name;
+      newPresetName = "";
+      notice = `Saved the preset ${name}.`;
+    } catch (e) {
+      notice = String(e);
+    }
+  }
 
   const release = $derived(compat.drupal.find((r) => r.id === input.drupal) ?? first);
   const dbTypes = $derived(Object.keys(release.databases) as DbType[]);
@@ -129,6 +174,16 @@
 </script>
 
 <section class="mx-auto max-w-3xl">
+  {#if presets.length}
+    <div class="mb-4 flex items-center gap-2 text-sm">
+      <label for="preset" class="text-slate-500">Start from preset</label>
+      <select id="preset" class="input w-auto" value={presetName} onchange={(e) => applyPreset(e.currentTarget.value)}>
+        <option value="">None</option>
+        {#each presets as p (p.name)}<option value={p.name}>{p.name}</option>{/each}
+      </select>
+      {#if presetNote}<span class="text-xs text-amber-700">{presetNote}</span>{/if}
+    </div>
+  {/if}
   <ol class="mb-5 flex gap-1 text-xs">
     {#each STEPS as label, i (label)}
       <li class="flex-1">
@@ -248,7 +303,7 @@
     {:else if STEPS[stepIndex] === "Services"}
       <div class="flex items-center justify-between">
         <span class="text-sm font-medium">Services</span>
-        <button class="text-xs text-drop hover:underline" onclick={() => (input.services = [...settings.services])}>
+        <button class="text-xs text-drop hover:underline" onclick={() => (input.services = [...(activePreset?.services ?? settings.services)])}>
           Reset to preset
         </button>
       </div>
@@ -295,6 +350,10 @@
           {showScript ? "Hide" : "Show"} commands
         </button>
         <button class="btn-ghost" onclick={exportScript}>Export as script…</button>
+      </div>
+      <div class="flex gap-2">
+        <input class="input flex-1" bind:value={newPresetName} placeholder="Name these choices to reuse them" />
+        <button class="btn-ghost" disabled={!newPresetName.trim()} onclick={savePreset}>Save as preset</button>
       </div>
       {#if notice}<p class="text-xs text-emerald-700">{notice}</p>{/if}
       {#if showScript}

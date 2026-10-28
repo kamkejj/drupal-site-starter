@@ -2,6 +2,7 @@ mod compat;
 mod config;
 mod env;
 mod preflight;
+mod presets;
 mod runner;
 mod script;
 mod settings;
@@ -34,6 +35,10 @@ fn data_file(app: &AppHandle, parts: &[&str]) -> Result<PathBuf, String> {
 
 fn settings_file(app: &AppHandle) -> Result<PathBuf, String> {
     data_file(app, &["settings.json"])
+}
+
+fn presets_file(app: &AppHandle) -> Result<PathBuf, String> {
+    data_file(app, &["presets.json"])
 }
 
 fn run_state_file(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
@@ -76,6 +81,44 @@ fn save_settings(app: AppHandle, settings: AppSettings, password: Option<String>
         Some(p) => settings::set_admin_password(&p),
         None => Ok(()),
     }
+}
+
+#[tauri::command]
+fn list_presets(app: AppHandle) -> Result<Vec<presets::Preset>, String> {
+    Ok(presets::load(&presets_file(&app)?))
+}
+
+fn update_presets(app: &AppHandle, change: impl FnOnce(&mut Vec<presets::Preset>)) -> Result<Vec<presets::Preset>, String> {
+    let file = presets_file(app)?;
+    let mut all = presets::load(&file);
+    change(&mut all);
+    presets::save(&file, &all)?;
+    Ok(all)
+}
+
+#[tauri::command]
+fn save_preset(app: AppHandle, preset: presets::Preset) -> Result<Vec<presets::Preset>, String> {
+    let preset = presets::Preset { name: preset.name.trim().to_string(), ..preset };
+    if preset.name.is_empty() {
+        return Err("Name the preset.".into());
+    }
+    update_presets(&app, |all| presets::merge(all, vec![preset]))
+}
+
+#[tauri::command]
+fn delete_preset(app: AppHandle, name: String) -> Result<Vec<presets::Preset>, String> {
+    update_presets(&app, |all| all.retain(|p| p.name != name))
+}
+
+#[tauri::command]
+fn import_presets(app: AppHandle, path: String) -> Result<Vec<presets::Preset>, String> {
+    let incoming = presets::read(Path::new(&path))?;
+    update_presets(&app, |all| presets::merge(all, incoming))
+}
+
+#[tauri::command]
+fn export_presets(app: AppHandle, path: String) -> Result<(), String> {
+    presets::write(Path::new(&path), &presets::load(&presets_file(&app)?))
 }
 
 #[tauri::command]
@@ -188,6 +231,45 @@ fn cancel_run(state: State<AppState>) {
     }
 }
 
+/// The IDE setting is a command name or an absolute path, spawned with the
+/// project folder as its only argument, never run through a shell.
+fn ide_program(ide: &str) -> Result<&str, String> {
+    let ide = ide.trim();
+    let valid = !ide.is_empty() && ide.chars().all(|c| c.is_ascii_alphanumeric() || "-_./".contains(c));
+    if valid { Ok(ide) } else { Err(format!("Set an IDE command in Settings, such as code or phpstorm (got {ide:?}).")) }
+}
+
+#[tauri::command]
+async fn open_in_ide(app: AppHandle, state: State<'_, AppState>, input: ProjectInput) -> Result<(), String> {
+    let p = parse(&state, &input).map_err(|e| format!("{e:?}"))?;
+    let settings = AppSettings::load(&settings_file(&app)?);
+    let ide = ide_program(&settings.ide)?;
+    tokio::process::Command::new(ide)
+        .arg(&p.dir)
+        .env("PATH", &state.exec.path)
+        .spawn()
+        .map(drop)
+        .map_err(|e| format!("Could not start {ide}: {e}. Is its command-line launcher installed?"))
+}
+
+#[tauri::command]
+async fn login_link(state: State<'_, AppState>, input: ProjectInput) -> Result<String, String> {
+    let p = parse(&state, &input).map_err(|e| format!("{e:?}"))?;
+    let out = tokio::process::Command::new("ddev")
+        .args(["drush", "user:login", "--no-browser"])
+        .current_dir(&p.dir)
+        .env("PATH", &state.exec.path)
+        .env("DDEV_NONINTERACTIVE", "true")
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    match stdout.lines().map(str::trim).rfind(|l| l.starts_with("http")) {
+        Some(url) if out.status.success() => Ok(url.to_string()),
+        _ => Err(format!("drush user:login failed: {}", String::from_utf8_lossy(&out.stderr).trim())),
+    }
+}
+
 /// `ddev delete -Oy` plus removing the folder. Refuses to remove a folder that
 /// isn't this DDEV project, so a wrong path can't wipe unrelated files.
 #[tauri::command]
@@ -243,6 +325,13 @@ pub fn run() {
             start_run,
             cancel_run,
             delete_project,
+            open_in_ide,
+            list_presets,
+            save_preset,
+            delete_preset,
+            import_presets,
+            export_presets,
+            login_link,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

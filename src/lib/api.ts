@@ -28,7 +28,7 @@ export type DrupalRelease = {
 export type Wiring =
   | { kind: "none" }
   | { kind: "containerOnly" }
-  | { kind: "module"; packages: string[]; modules: string[]; setup: { title: string; drush: string[] }[] };
+  | { kind: "module"; packages: string[]; modules: string[]; setup: { title: string; drush: string[] }[]; settings: string | null };
 
 export type Service = {
   id: string;
@@ -82,6 +82,11 @@ export type AppSettings = {
   ide: string;
 };
 
+export type Preset = Pick<
+  ProjectInput,
+  "drupal" | "php" | "webserver" | "database" | "services" | "configSyncDir" | "exportConfigOnInstall" | "initGit"
+> & { name: string };
+
 export type CheckResult = {
   id: string;
   label: string;
@@ -125,6 +130,13 @@ export const api = {
   },
   cancelRun: () => invoke<void>("cancel_run"),
   deleteProject: (input: ProjectInput) => invoke<void>("delete_project", { input }),
+  listPresets: () => invoke<Preset[]>("list_presets"),
+  savePreset: (preset: Preset) => invoke<Preset[]>("save_preset", { preset }),
+  deletePreset: (name: string) => invoke<Preset[]>("delete_preset", { name }),
+  importPresets: (path: string) => invoke<Preset[]>("import_presets", { path }),
+  exportPresets: (path: string) => invoke<void>("export_presets", { path }),
+  openInIde: (input: ProjectInput) => invoke<void>("open_in_ide", { input }),
+  loginLink: (input: ProjectInput) => invoke<string>("login_link", { input }),
 };
 
 /** `plan_project` rejects with a FieldError list; other commands with a string. */

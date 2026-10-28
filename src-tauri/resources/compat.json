@@ -119,9 +119,36 @@
       },
       "defaultOn": false
     },
-    { "id": "elasticsearch", "label": "Elasticsearch", "addon": "ddev/ddev-elasticsearch", "wiring": { "kind": "containerOnly" }, "defaultOn": false },
+    {
+      "id": "elasticsearch",
+      "label": "Elasticsearch",
+      "addon": "ddev/ddev-elasticsearch",
+      "wiring": {
+        "kind": "module",
+        "packages": ["drupal/elasticsearch_connector:^9.0@alpha"],
+        "modules": ["elasticsearch_connector"],
+        "setup": [
+          {
+            "title": "Create the Elasticsearch search server",
+            "drush": ["php:eval", "$id = 'elasticsearch'; if (!\\Drupal\\search_api\\Entity\\Server::load($id)) { \\Drupal\\search_api\\Entity\\Server::create(['id' => $id, 'name' => 'Elasticsearch', 'backend' => 'elasticsearch', 'backend_config' => ['connector' => 'standard', 'connector_config' => ['url' => 'http://elasticsearch:9200', 'enable_debug_logging' => FALSE]]])->save(); }"]
+          }
+        ]
+      },
+      "defaultOn": false
+    },
     { "id": "varnish", "label": "Varnish", "addon": "ddev/ddev-varnish", "wiring": { "kind": "containerOnly" }, "defaultOn": false },
-    { "id": "memcached", "label": "Memcached", "addon": "ddev/ddev-memcached", "wiring": { "kind": "containerOnly" }, "defaultOn": false },
+    {
+      "id": "memcached",
+      "label": "Memcached",
+      "addon": "ddev/ddev-memcached",
+      "wiring": {
+        "kind": "module",
+        "packages": ["drupal/memcache"],
+        "modules": ["memcache"],
+        "settings": "$settings['memcache']['servers'] = ['memcached:11211' => 'default'];\n$settings['memcache']['bins'] = ['default' => 'default'];\n$settings['cache']['default'] = 'cache.backend.memcache';"
+      },
+      "defaultOn": false
+    },
     { "id": "selenium", "label": "Selenium", "addon": "ddev/ddev-selenium-standalone-chrome", "wiring": { "kind": "none" }, "defaultOn": false }
   ]
 }

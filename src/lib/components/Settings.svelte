@@ -1,8 +1,8 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import PasswordInput from "./PasswordInput.svelte";
-  import { api, type AppSettings, type Compat } from "$lib/api";
+  import { api, type AppSettings, type Compat, type Preset } from "$lib/api";
 
   let {
     compat,
@@ -32,6 +32,36 @@
       ? draft.services.filter((s) => s !== id)
       : [...draft.services, id];
   }
+
+  const PRESET_FILES = [{ name: "Presets", extensions: ["yaml", "yml", "json"] }];
+  let presets = $state<Preset[]>([]);
+  let presetNotice = $state("");
+  api.listPresets().then((p) => (presets = p));
+
+  async function presetAction(action: () => Promise<string | void>) {
+    presetNotice = "";
+    try {
+      presetNotice = (await action()) ?? "";
+    } catch (e) {
+      presetNotice = String(e);
+    }
+  }
+
+  const importPresets = () =>
+    presetAction(async () => {
+      const path = await open({ filters: PRESET_FILES });
+      if (typeof path !== "string") return;
+      presets = await api.importPresets(path);
+      return `Imported presets from ${path}.`;
+    });
+
+  const exportPresets = () =>
+    presetAction(async () => {
+      const path = await saveDialog({ defaultPath: "presets.yaml", filters: PRESET_FILES });
+      if (!path) return;
+      await api.exportPresets(path);
+      return `Exported ${presets.length} presets to ${path}.`;
+    });
 
   async function save() {
     try {
@@ -84,6 +114,30 @@
         >
       {/each}
     </div>
+  </div>
+
+  <div class="field">
+    <div class="flex items-center justify-between">
+      <span>Presets</span>
+      <div class="flex gap-2">
+        <button class="btn-ghost" onclick={importPresets}>Import…</button>
+        <button class="btn-ghost" disabled={!presets.length} onclick={exportPresets}>Export…</button>
+      </div>
+    </div>
+    {#if presets.length}
+      <ul class="divide-y divide-slate-200 rounded-md border border-slate-200 text-sm dark:divide-slate-800 dark:border-slate-800">
+        {#each presets as p (p.name)}
+          {@const label = compat.drupal.find((r) => r.id === p.drupal)?.label ?? p.drupal}
+          <li class="flex items-center justify-between px-3 py-2">
+            <span><span class="font-medium">{p.name}</span> <span class="text-xs text-slate-500">{label}, PHP {p.php}, {p.database.type} {p.database.version}</span></span>
+            <button class="text-xs text-red-600 hover:underline" onclick={() => presetAction(async () => void (presets = await api.deletePreset(p.name)))}>Delete</button>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <small class="text-slate-500">Save a preset from the wizard's Review step, or import one.</small>
+    {/if}
+    {#if presetNotice}<small class="text-slate-500">{presetNotice}</small>{/if}
   </div>
 
   {#if error}<p class="error">{error}</p>{/if}

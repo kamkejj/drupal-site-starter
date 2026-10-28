@@ -206,6 +206,11 @@ impl<E: Executor> Run<'_, E> {
                 }
                 return std::fs::write(target, contents).map_err(|e| e.to_string());
             }
+            Action::AppendFile { path, text } => {
+                use std::io::Write;
+                let mut f = std::fs::OpenOptions::new().append(true).open(self.dir.join(path)).map_err(|e| format!("{path}: {e}"))?;
+                return f.write_all(text.as_bytes()).map_err(|e| e.to_string());
+            }
             Action::SetConfigSyncDir { dir } => {
                 let path = self.dir.join(SETTINGS_PHP);
                 let current = std::fs::read_to_string(&path).map_err(|e| format!("{SETTINGS_PHP}: {e}"))?;

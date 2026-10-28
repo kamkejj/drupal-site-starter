@@ -56,6 +56,15 @@
     }
   }
 
+  async function act(action: () => Promise<unknown>) {
+    error = "";
+    try {
+      await action();
+    } catch (e) {
+      error = String(e);
+    }
+  }
+
   async function deleteAndStartOver() {
     const ok = await ask(`Delete the DDEV project ${input.name} and remove ${plan?.dir}?`, {
       title: "Delete and start over",
@@ -126,7 +135,9 @@
           <button class="btn-ghost" onclick={() => api.cancelRun()}>Cancel</button>
         {:else if phase === "done"}
           <button class="btn-ghost" onclick={() => plan && revealItemInDir(plan.dir)}>Show folder</button>
-          <button class="btn-primary" onclick={async () => openUrl(await api.projectUrl(input.name))}>Open site</button>
+          <button class="btn-ghost" onclick={() => act(() => api.openInIde(input))}>Open in IDE</button>
+          <button class="btn-ghost" onclick={() => act(async () => openUrl(await api.loginLink(input)))}>Log in as admin</button>
+          <button class="btn-primary" onclick={() => act(async () => openUrl(await api.projectUrl(input.name)))}>Open site</button>
           <button class="btn-ghost" onclick={onBack}>New site</button>
         {:else}
           {#if failed?.[1].retry.kind !== "startOver"}

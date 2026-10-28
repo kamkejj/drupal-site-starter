@@ -1,6 +1,5 @@
 ---
 source: src/steps.rs
-assertion_line: 372
 expression: script
 ---
 #!/usr/bin/env bash
@@ -19,25 +18,16 @@ mkdir -p mysite
 cd mysite
 
 # Configure DDEV
-ddev config --project-name=mysite --project-type=drupal12 --docroot=web --php-version=8.5 --webserver-type=nginx-fpm --database=postgres:18
+ddev config --project-name=mysite --project-type=drupal11 --docroot=web --php-version=8.3 --webserver-type=nginx-fpm --database=mariadb:10.11
 
 # Start DDEV
 ddev start
 
-# Download Drupal 12
-ddev composer create-project drupal/recommended-project:^12@beta -n
-
-# Set Composer minimum-stability to dev
-ddev composer config minimum-stability dev
-
-# Set Composer preferred-install.drupal/core to source
-ddev composer config preferred-install.drupal/core source
-
-# Reinstall drupal/core
-ddev composer reinstall drupal/core -n
+# Download Drupal 11
+ddev composer create-project drupal/recommended-project:^11 -n
 
 # Add Drush
-ddev composer require drush/drush:^14 -n
+ddev composer require drush/drush -n
 
 # Allow Composer plugin dealerdirect/phpcodesniffer-composer-installer
 ddev composer config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
@@ -52,10 +42,13 @@ ddev composer config --no-plugins allow-plugins.php-http/discovery true
 ddev composer config --no-plugins allow-plugins.tbachert/spi true
 
 # Add code quality and testing tools (drupal/core-dev)
-ddev composer require --dev drupal/core-dev:^12 --with-all-dependencies -n
+ddev composer require --dev drupal/core-dev:^11 --with-all-dependencies -n
 
-# Add the Adminer add-on
-ddev add-on get ddev/ddev-adminer
+# Add the Memcached add-on
+ddev add-on get ddev/ddev-memcached
+
+# Add the Elasticsearch add-on
+ddev add-on get ddev/ddev-elasticsearch
 
 # Restart DDEV
 ddev restart
@@ -96,7 +89,7 @@ cat > phpunit.xml <<'DDEV_CREATOR_EOF'
     <ini name="error_reporting" value="32767"/>
     <ini name="memory_limit" value="-1"/>
     <env name="SIMPLETEST_BASE_URL" value="http://web" force="true"/>
-    <env name="SIMPLETEST_DB" value="pgsql://db:db@db/db" force="true"/>
+    <env name="SIMPLETEST_DB" value="mysql://db:db@db/db" force="true"/>
     <env name="BROWSERTEST_OUTPUT_DIRECTORY" value="web/sites/simpletest/browser_output"/>
   </php>
   <testsuites>
@@ -143,6 +136,40 @@ ddev drush site:install standard -y --account-name=admin --account-mail=me@examp
 
 # Set the admin password
 printf '%s\n' "$DRUPAL_ADMIN_PASS" | ddev exec 'read -r p && drush user:password admin "$p"'
+
+# Add the Memcached module
+ddev composer require drupal/memcache -n
+
+# Enable the Memcached module
+ddev drush pm:enable -y memcache
+
+# Write settings.memcached.php
+mkdir -p web/sites/default
+cat > web/sites/default/settings.memcached.php <<'DDEV_CREATOR_EOF'
+<?php
+
+$settings['memcache']['servers'] = ['memcached:11211' => 'default'];
+$settings['memcache']['bins'] = ['default' => 'default'];
+$settings['cache']['default'] = 'cache.backend.memcache';
+DDEV_CREATOR_EOF
+
+# Include settings.memcached.php from settings.php
+cat >> web/sites/default/settings.php <<'DDEV_CREATOR_EOF'
+
+// Memcached settings, written by Drupal DDEV Site Creator.
+if (getenv('IS_DDEV_PROJECT') == 'true' && file_exists(__DIR__ . '/settings.memcached.php')) {
+  include __DIR__ . '/settings.memcached.php';
+}
+DDEV_CREATOR_EOF
+
+# Add the Elasticsearch module
+ddev composer require drupal/elasticsearch_connector:^9.0@alpha -n
+
+# Enable the Elasticsearch module
+ddev drush pm:enable -y elasticsearch_connector
+
+# Create the Elasticsearch search server
+ddev drush php:eval '$id = '\''elasticsearch'\''; if (!\Drupal\search_api\Entity\Server::load($id)) { \Drupal\search_api\Entity\Server::create(['\''id'\'' => $id, '\''name'\'' => '\''Elasticsearch'\'', '\''backend'\'' => '\''elasticsearch'\'', '\''backend_config'\'' => ['\''connector'\'' => '\''standard'\'', '\''connector_config'\'' => ['\''url'\'' => '\''http://elasticsearch:9200'\'', '\''enable_debug_logging'\'' => FALSE]]])->save(); }'
 
 # Export configuration
 ddev drush config:export -y

@@ -24,6 +24,7 @@ pub enum Action {
     CreateProjectDir,
     Mkdir { path: String },
     WriteFile { path: String, contents: String },
+    AppendFile { path: String, text: String },
     /// Inserts `config_sync_directory` above the DDEV include in settings.php.
     SetConfigSyncDir { dir: String },
 }
@@ -285,7 +286,7 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     ));
 
     for s in &p.services {
-        if let Wiring::Module { packages, modules, setup } = &s.wiring {
+        if let Wiring::Module { packages, modules, setup, settings } = &s.wiring {
             let mut require = vec!["composer", "require"];
             require.extend(packages.iter().map(String::as_str));
             require.push("-n");
@@ -299,6 +300,33 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
                 let mut args = vec!["drush"];
                 args.extend(cmd.drush.iter().map(String::as_str));
                 steps.push(step(format!("wire:{}:setup:{n}", s.id), cmd.title.clone(), ddev(&args), 5 * MIN));
+            }
+
+            if let Some(php) = settings {
+                let file = format!("settings.{}.php", s.id);
+                steps.push(step(
+                    format!("wire:{}:settings", s.id),
+                    format!("Write {file}"),
+                    Action::WriteFile { path: format!("{DOCROOT}/sites/default/{file}"), contents: format!("<?php\n\n{php}\n") },
+                    MIN,
+                ));
+                steps.push(
+                    step(
+                        format!("wire:{}:include", s.id),
+                        format!("Include {file} from settings.php"),
+                        Action::AppendFile {
+                            path: SETTINGS_PHP.into(),
+                            text: format!(
+                                "\n// {label} settings, written by Drupal DDEV Site Creator.\n\
+                                 if (getenv('IS_DDEV_PROJECT') == 'true' && file_exists(__DIR__ . '/{file}')) {{\n  \
+                                 include __DIR__ . '/{file}';\n}}\n",
+                                label = s.label,
+                            ),
+                        },
+                        MIN,
+                    )
+                    .check(contains(SETTINGS_PHP, &file)),
+                );
             }
         }
     }
@@ -383,6 +411,13 @@ mod tests {
             i.drupal = "12".into();
             i.php = "8.5".into();
             i.database = Database { kind: DbType::Postgres, version: "18".into() };
+        });
+    }
+
+    #[test]
+    fn drupal11_memcached_elasticsearch() {
+        snapshot("drupal11-memcached-elasticsearch", |i| {
+            i.services = vec!["memcached".into(), "elasticsearch".into()];
         });
     }
 

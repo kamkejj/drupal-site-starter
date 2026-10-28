@@ -33,6 +33,9 @@ fn render_action(action: &Action, p: &Project) -> String {
             let mkdir = if dir == "." { String::new() } else { format!("mkdir -p {}\n", quote(&dir)) };
             format!("{mkdir}cat > {} <<'DDEV_CREATOR_EOF'\n{}DDEV_CREATOR_EOF", quote(path), contents)
         }
+        Action::AppendFile { path, text } => {
+            format!("cat >> {} <<'DDEV_CREATOR_EOF'\n{}DDEV_CREATOR_EOF", quote(path), text)
+        }
         Action::SetConfigSyncDir { dir } => {
             let line = config_sync_line(dir);
             format!(

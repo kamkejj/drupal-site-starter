@@ -66,12 +66,16 @@ pub enum Wiring {
     None,
     ContainerOnly,
     /// `setup` runs after the modules are enabled, for wiring a module alone
-    /// can't do, such as creating a Search API server.
+    /// can't do, such as creating a Search API server. `settings` is PHP that
+    /// goes in its own settings file, included from settings.php after the
+    /// modules are enabled, because it names services they define.
     Module {
         packages: Vec<String>,
         modules: Vec<String>,
         #[serde(default)]
         setup: Vec<SetupCommand>,
+        #[serde(default)]
+        settings: Option<String>,
     },
 }
 

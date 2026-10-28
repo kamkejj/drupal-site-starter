@@ -93,16 +93,18 @@ into Drupal and which are "container only".
 | ------------- | -------------------------------------- | ------------------------------------- | ------- |
 | Mailpit       | Built into DDEV                        | None needed                           | On      |
 | Adminer       | `ddev/ddev-adminer`                    | None needed                           | On      |
-| Redis         | `ddev/ddev-redis`                      | `drupal/redis` + `settings.php` block | Off     |
-| Solr          | `ddev/ddev-solr`                       | `drupal/search_api_solr` + server     | Off     |
-| Elasticsearch | `ddev/ddev-elasticsearch`              | Search API backend (container only at first) | Off |
-| Varnish       | `ddev/ddev-varnish`                    | `drupal/purge` (container only at first) | Off  |
+| Redis         | `ddev/ddev-redis`                      | `drupal/redis` (the add-on writes the `settings.php` block) | Off |
+| Solr          | `ddev/ddev-solr`                       | `drupal/search_api_solr` + server and configset | Off |
+| Elasticsearch | `ddev/ddev-elasticsearch`              | `drupal/elasticsearch_connector` (alpha) + server | Off |
+| Varnish       | `ddev/ddev-varnish`                    | Container only (see below)            | Off     |
 | Memcached     | `ddev/ddev-memcached`                  | `drupal/memcache` + `settings.php` block | Off  |
-| Selenium      | `ddev/ddev-selenium-standalone-chrome` | Used by FunctionalJavascript tests    | Off     |
+| Selenium      | `ddev/ddev-selenium-standalone-chrome` | None needed (the add-on sets the WebDriver env) | Off |
 
 - **UI:** toggle chips with a "Reset to preset" button.
 - Users can save their own service presets.
-- MVP wires Redis and Solr; the rest start as "container only".
+- Varnish stays "container only". Drupal's default page max-age is 0, so
+  Varnish serves nothing stale. Wiring `drupal/purge` also needs a VCL that
+  handles BAN by cache tag, which means replacing the add-on's own VCL.
 
 ### 2.7 Always Included: Code Quality and Testing
 
