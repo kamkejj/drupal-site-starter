@@ -370,7 +370,7 @@ mod smoke {
         let parent = PathBuf::from(std::env::var("SMOKE_PARENT").expect("SMOKE_PARENT"));
         let mut i = input(&parent);
         i.drupal = std::env::var("SMOKE_DRUPAL").unwrap_or_else(|_| "11".into());
-        i.name = format!("ddevcreator-smoke-{}", i.drupal);
+        i.name = std::env::var("SMOKE_NAME").unwrap_or_else(|_| format!("ddevcreator-smoke-{}", i.drupal));
         i.services = vec!["mailpit".into(), "adminer".into(), "redis".into()];
         let compat = Compat::bundled();
         let p = parse(&i, &compat).unwrap();

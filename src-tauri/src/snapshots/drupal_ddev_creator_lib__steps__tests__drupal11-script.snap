@@ -137,6 +137,9 @@ printf '%s\n' "$DRUPAL_ADMIN_PASS" | ddev exec 'read -r p && drush user:password
 # Export configuration
 ddev drush config:export -y
 
+# Write protective .htaccess files
+ddev drush php:eval '\Drupal::service('\''file.htaccess_writer'\'')->ensure();'
+
 # Write .gitignore
 cat > .gitignore <<'DDEV_CREATOR_EOF'
 /vendor/

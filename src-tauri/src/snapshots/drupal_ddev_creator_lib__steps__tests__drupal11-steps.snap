@@ -27,6 +27,7 @@ settings-config-sync: {"kind":"setConfigSyncDir","dir":"../config/sync"}
 site-install: {"kind":"ddev","args":["drush","site:install","standard","-y","--account-name=admin","--account-mail=me@example.com","--site-name=My Site"],"stdin_secret":false}
 admin-password: {"kind":"ddev","args":["exec","read -r p && drush user:password admin \"$p\""],"stdin_secret":true}
 config-export: {"kind":"ddev","args":["drush","config:export","-y"],"stdin_secret":false}
+htaccess: {"kind":"ddev","args":["drush","php:eval","\\Drupal::service('file.htaccess_writer')->ensure();"],"stdin_secret":false}
 write:.gitignore: write .gitignore
 git-init: {"kind":"git","args":["init","-q"]}
 git-add: {"kind":"git","args":["add","-A"]}

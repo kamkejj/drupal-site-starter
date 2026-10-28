@@ -151,3 +151,6 @@ ddev composer require drupal/search_api_solr -n
 
 # Enable the Solr module
 ddev drush pm:enable -y search_api_solr
+
+# Write protective .htaccess files
+ddev drush php:eval '\Drupal::service('\''file.htaccess_writer'\'')->ensure();'

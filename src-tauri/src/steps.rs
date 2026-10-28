@@ -269,6 +269,15 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
         steps.push(step("config-export", "Export configuration", ddev(&["drush", "config:export", "-y"]), 5 * MIN));
     }
 
+    // Cron writes these on the first page view; writing them now keeps the
+    // first commit from going dirty.
+    steps.push(step(
+        "htaccess",
+        "Write protective .htaccess files",
+        ddev(&["drush", "php:eval", "\\Drupal::service('file.htaccess_writer')->ensure();"]),
+        MIN,
+    ));
+
     if p.init_git {
         steps.push(
             step(

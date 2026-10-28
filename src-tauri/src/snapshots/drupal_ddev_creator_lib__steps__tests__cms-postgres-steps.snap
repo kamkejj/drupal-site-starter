@@ -32,3 +32,4 @@ wire:redis:require: {"kind":"ddev","args":["composer","require","drupal/redis","
 wire:redis:enable: {"kind":"ddev","args":["drush","pm:enable","-y","redis"],"stdin_secret":false}
 wire:solr:require: {"kind":"ddev","args":["composer","require","drupal/search_api_solr","-n"],"stdin_secret":false}
 wire:solr:enable: {"kind":"ddev","args":["drush","pm:enable","-y","search_api_solr"],"stdin_secret":false}
+htaccess: {"kind":"ddev","args":["drush","php:eval","\\Drupal::service('file.htaccess_writer')->ensure();"],"stdin_secret":false}
