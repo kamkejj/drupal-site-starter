@@ -21,7 +21,8 @@ body {
 @utility field {
   @apply flex flex-col gap-1 text-sm;
 }
-.field > span {
+.field > span,
+.field > label {
   @apply font-medium text-slate-700 dark:text-slate-300;
 }
 @utility input {

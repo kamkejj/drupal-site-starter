@@ -41,6 +41,7 @@
   let stepIndex = $state(0);
   let displayName = $state("");
   let password = $state("");
+  let showPassword = $state(false);
   let taken = $state<string[]>([]);
   let plan = $state<Plan | null>(null);
   let errors = $state<FieldError[]>([]);
@@ -176,15 +177,38 @@
           {#if errorFor("adminEmail")}<small class="error">{errorFor("adminEmail")}</small>{/if}
         </label>
       </div>
-      <label class="field">
-        <span>Admin password for this project</span>
-        <input
-          class="input"
-          type="password"
-          bind:value={password}
-          placeholder={hasPassword ? "Leave empty to use the saved password" : "Required (no saved password)"}
-        />
-      </label>
+      <div class="field">
+        <label for="admin-password">Admin password for this project</label>
+        <div class="relative">
+          <input
+            id="admin-password"
+            class="input w-full pr-10"
+            type={showPassword ? "text" : "password"}
+            autocomplete="new-password"
+            bind:value={password}
+            placeholder={hasPassword ? "Leave empty to use the saved password" : "Required (no saved password)"}
+          />
+          <button
+            type="button"
+            class="absolute inset-y-0 right-0 grid w-10 place-items-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
+            onclick={() => (showPassword = !showPassword)}
+          >
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              {#if showPassword}
+                <path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.7 2.7" />
+                <path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.4-1.6" />
+                <path d="M9.9 9.9a3 3 0 1 0 4.2 4.2" />
+                <path d="m2 2 20 20" />
+              {:else}
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              {/if}
+            </svg>
+          </button>
+        </div>
+      </div>
     {:else if STEPS[stepIndex] === "Drupal and PHP"}
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {#each compat.drupal as r (r.id)}
