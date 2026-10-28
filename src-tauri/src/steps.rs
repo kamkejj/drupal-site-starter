@@ -92,6 +92,12 @@ fn simpletest_db(kind: DbType) -> &'static str {
 
 const MIN: u64 = 60;
 
+/// PHPStan exits 1 when it finds no files, which a fresh site always hits,
+/// so skip it until custom code exists. The extensions match phpstan-drupal's.
+const ANALYSE: &str = "if find web/modules/custom web/themes/custom -type f \\( -name '*.php' -o -name '*.module' \
+    -o -name '*.inc' -o -name '*.install' -o -name '*.theme' -o -name '*.profile' \\) | grep -q .; \
+    then phpstan analyse --memory-limit=-1; else echo 'No custom code to analyse yet.'; fi";
+
 pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     let r = &p.release;
     let mut steps = vec![
@@ -188,7 +194,7 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
 
     for (name, command) in [
         ("lint", "phpcs"),
-        ("analyse", "phpstan analyse --memory-limit=-1"),
+        ("analyse", ANALYSE),
         ("test", "phpunit"),
     ] {
         steps.push(step(
