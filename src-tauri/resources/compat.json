@@ -1,0 +1,89 @@
+{
+  "minDdevVersion": "1.24.0",
+  "minDdevVersionPodman": "1.25.0",
+  "composerPlugins": [
+    "dealerdirect/phpcodesniffer-composer-installer",
+    "phpstan/extension-installer",
+    "php-http/discovery",
+    "tbachert/spi"
+  ],
+  "drupal": [
+    {
+      "id": "11",
+      "label": "Drupal 11",
+      "package": "drupal/recommended-project:^11",
+      "ddevType": "drupal11",
+      "coreMajor": 11,
+      "installProfile": "standard",
+      "includesDrush": false,
+      "php": ["8.3", "8.4", "8.5"],
+      "defaultPhp": "8.3",
+      "databases": {
+        "mariadb": ["10.6", "10.11", "11.4", "11.8"],
+        "mysql": ["8.0", "8.4"],
+        "postgres": ["16", "17"]
+      },
+      "defaultDatabase": { "type": "mariadb", "version": "10.11" },
+      "status": "supported"
+    },
+    {
+      "id": "cms",
+      "label": "Drupal CMS",
+      "package": "drupal/cms",
+      "ddevType": "drupal11",
+      "coreMajor": 11,
+      "installProfile": "drupal_cms_installer",
+      "includesDrush": false,
+      "php": ["8.3", "8.4", "8.5"],
+      "defaultPhp": "8.3",
+      "databases": {
+        "mariadb": ["10.6", "10.11", "11.4", "11.8"],
+        "mysql": ["8.0", "8.4"],
+        "postgres": ["16", "17"]
+      },
+      "defaultDatabase": { "type": "mariadb", "version": "10.11" },
+      "status": "supported"
+    },
+    {
+      "id": "10",
+      "label": "Drupal 10",
+      "package": "drupal/recommended-project:^10",
+      "ddevType": "drupal10",
+      "coreMajor": 10,
+      "installProfile": "standard",
+      "includesDrush": false,
+      "php": ["8.1", "8.2", "8.3", "8.4"],
+      "defaultPhp": "8.3",
+      "databases": {
+        "mariadb": ["10.6", "10.11", "11.4"],
+        "mysql": ["8.0", "8.4"],
+        "postgres": ["16", "17"]
+      },
+      "defaultDatabase": { "type": "mariadb", "version": "10.11" },
+      "status": "ending-soon",
+      "statusNote": "Drupal 10 reaches end of life around December 2026."
+    }
+  ],
+  "services": [
+    { "id": "mailpit", "label": "Mailpit", "addon": null, "wiring": { "kind": "none" }, "defaultOn": true },
+    { "id": "adminer", "label": "Adminer", "addon": "ddev/ddev-adminer", "wiring": { "kind": "none" }, "defaultOn": true },
+    {
+      "id": "redis",
+      "label": "Redis",
+      "addon": "ddev/ddev-redis",
+      "wiring": { "kind": "module", "packages": ["drupal/redis"], "modules": ["redis"] },
+      "defaultOn": false
+    },
+    {
+      "id": "solr",
+      "label": "Solr",
+      "addon": "ddev/ddev-solr",
+      "wiring": { "kind": "module", "packages": ["drupal/search_api_solr"], "modules": ["search_api_solr"] },
+      "defaultOn": false
+    },
+    { "id": "elasticsearch", "label": "Elasticsearch", "addon": "ddev/ddev-elasticsearch", "wiring": { "kind": "containerOnly" }, "defaultOn": false },
+    { "id": "varnish", "label": "Varnish", "addon": "ddev/ddev-varnish", "wiring": { "kind": "containerOnly" }, "defaultOn": false },
+    { "id": "memcached", "label": "Memcached", "addon": "ddev/ddev-memcached", "wiring": { "kind": "containerOnly" }, "defaultOn": false },
+    { "id": "selenium", "label": "Selenium", "addon": "ddev/ddev-selenium-standalone-chrome", "wiring": { "kind": "none" }, "defaultOn": false }
+  ]
+}
