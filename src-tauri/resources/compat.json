@@ -9,13 +9,37 @@
   ],
   "drupal": [
     {
+      "id": "12",
+      "label": "Drupal 12",
+      "package": "drupal/recommended-project:^12@beta",
+      "ddevType": "drupal12",
+      "installProfile": "standard",
+      "composerConfig": [
+        ["minimum-stability", "dev"],
+        ["preferred-install.drupal/core", "source"]
+      ],
+      "reinstall": ["drupal/core"],
+      "drushPackage": "drush/drush:^14",
+      "devPackage": "drupal/core-dev:^12",
+      "php": ["8.5"],
+      "defaultPhp": "8.5",
+      "databases": {
+        "mariadb": ["10.11", "11.4", "11.8"],
+        "mysql": ["8.0", "8.4"],
+        "postgres": ["18"]
+      },
+      "defaultDatabase": { "type": "mariadb", "version": "11.8" },
+      "status": "preview",
+      "statusNote": "Drupal 12 is in beta. It uses a development build of Drush 14 and installs core from Git so its test tools are present. Many contributed modules don't support it yet."
+    },
+    {
       "id": "11",
       "label": "Drupal 11",
       "package": "drupal/recommended-project:^11",
       "ddevType": "drupal11",
-      "coreMajor": 11,
       "installProfile": "standard",
-      "includesDrush": false,
+      "drushPackage": "drush/drush",
+      "devPackage": "drupal/core-dev:^11",
       "php": ["8.3", "8.4", "8.5"],
       "defaultPhp": "8.3",
       "databases": {
@@ -31,9 +55,9 @@
       "label": "Drupal CMS",
       "package": "drupal/cms",
       "ddevType": "drupal11",
-      "coreMajor": 11,
       "installProfile": "drupal_cms_installer",
-      "includesDrush": false,
+      "drushPackage": "drush/drush",
+      "devPackage": "drupal/core-dev:^11",
       "php": ["8.3", "8.4", "8.5"],
       "defaultPhp": "8.3",
       "databases": {
@@ -49,9 +73,9 @@
       "label": "Drupal 10",
       "package": "drupal/recommended-project:^10",
       "ddevType": "drupal10",
-      "coreMajor": 10,
       "installProfile": "standard",
-      "includesDrush": false,
+      "drushPackage": "drush/drush",
+      "devPackage": "drupal/core-dev:^10",
       "php": ["8.1", "8.2", "8.3", "8.4"],
       "defaultPhp": "8.3",
       "databases": {

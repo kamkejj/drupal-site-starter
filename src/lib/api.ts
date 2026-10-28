@@ -12,14 +12,16 @@ export type DrupalRelease = {
   label: string;
   package: string;
   ddevType: string;
-  coreMajor: number;
   installProfile: string;
-  includesDrush: boolean;
+  composerConfig?: [string, string][];
+  reinstall?: string[];
+  drushPackage: string | null;
+  devPackage: string;
   php: string[];
   defaultPhp: string;
   databases: Partial<Record<DbType, string[]>>;
   defaultDatabase: Database;
-  status: "supported" | "ending-soon";
+  status: "supported" | "ending-soon" | "preview";
   statusNote?: string | null;
 };
 

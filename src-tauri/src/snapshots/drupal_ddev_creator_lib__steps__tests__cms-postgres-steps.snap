@@ -21,8 +21,8 @@ write:phpstan.neon: write phpstan.neon
 write:phpunit.xml: write phpunit.xml
 write:web/modules/custom/.gitkeep: write web/modules/custom/.gitkeep
 write:web/themes/custom/.gitkeep: write web/themes/custom/.gitkeep
-script:lint: {"kind":"ddev","args":["composer","config","scripts.lint","phpcs"],"stdin_secret":false}
-script:analyse: {"kind":"ddev","args":["composer","config","scripts.analyse","if find web/modules/custom web/themes/custom -type f \\( -name '*.php' -o -name '*.module' -o -name '*.inc' -o -name '*.install' -o -name '*.theme' -o -name '*.profile' \\) | grep -q .; then phpstan analyse --memory-limit=-1; else echo 'No custom code to analyse yet.'; fi"],"stdin_secret":false}
+script:lint: {"kind":"ddev","args":["composer","config","scripts.lint","if find web/modules/custom web/themes/custom -type f \\( -name '*.php' -o -name '*.module' -o -name '*.inc' -o -name '*.install' -o -name '*.test' -o -name '*.profile' -o -name '*.theme' -o -name '*.info' -o -name '*.yml' \\) | grep -q .; then phpcs; else echo 'No custom code to check yet.'; fi"],"stdin_secret":false}
+script:analyse: {"kind":"ddev","args":["composer","config","scripts.analyse","if find web/modules/custom web/themes/custom -type f \\( -name '*.php' -o -name '*.module' -o -name '*.inc' -o -name '*.install' -o -name '*.theme' -o -name '*.profile' \\) | grep -q .; then phpstan analyse --memory-limit=-1; else echo 'No custom code to check yet.'; fi"],"stdin_secret":false}
 script:test: {"kind":"ddev","args":["composer","config","scripts.test","phpunit"],"stdin_secret":false}
 mkdir-config-sync: {"kind":"mkdir","path":"config/sync"}
 settings-config-sync: {"kind":"setConfigSyncDir","dir":"../config/sync"}

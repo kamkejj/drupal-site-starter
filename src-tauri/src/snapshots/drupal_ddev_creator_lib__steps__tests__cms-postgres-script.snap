@@ -119,10 +119,10 @@ mkdir -p web/modules/custom && touch web/modules/custom/.gitkeep
 mkdir -p web/themes/custom && touch web/themes/custom/.gitkeep
 
 # Add the composer lint script
-ddev composer config scripts.lint phpcs
+ddev composer config scripts.lint 'if find web/modules/custom web/themes/custom -type f \( -name '\''*.php'\'' -o -name '\''*.module'\'' -o -name '\''*.inc'\'' -o -name '\''*.install'\'' -o -name '\''*.test'\'' -o -name '\''*.profile'\'' -o -name '\''*.theme'\'' -o -name '\''*.info'\'' -o -name '\''*.yml'\'' \) | grep -q .; then phpcs; else echo '\''No custom code to check yet.'\''; fi'
 
 # Add the composer analyse script
-ddev composer config scripts.analyse 'if find web/modules/custom web/themes/custom -type f \( -name '\''*.php'\'' -o -name '\''*.module'\'' -o -name '\''*.inc'\'' -o -name '\''*.install'\'' -o -name '\''*.theme'\'' -o -name '\''*.profile'\'' \) | grep -q .; then phpstan analyse --memory-limit=-1; else echo '\''No custom code to analyse yet.'\''; fi'
+ddev composer config scripts.analyse 'if find web/modules/custom web/themes/custom -type f \( -name '\''*.php'\'' -o -name '\''*.module'\'' -o -name '\''*.inc'\'' -o -name '\''*.install'\'' -o -name '\''*.theme'\'' -o -name '\''*.profile'\'' \) | grep -q .; then phpstan analyse --memory-limit=-1; else echo '\''No custom code to check yet.'\''; fi'
 
 # Add the composer test script
 ddev composer config scripts.test phpunit

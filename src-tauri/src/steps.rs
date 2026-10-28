@@ -92,11 +92,24 @@ fn simpletest_db(kind: DbType) -> &'static str {
 
 const MIN: u64 = 60;
 
-/// PHPStan exits 1 when it finds no files, which a fresh site always hits,
-/// so skip it until custom code exists. The extensions match phpstan-drupal's.
-const ANALYSE: &str = "if find web/modules/custom web/themes/custom -type f \\( -name '*.php' -o -name '*.module' \
-    -o -name '*.inc' -o -name '*.install' -o -name '*.theme' -o -name '*.profile' \\) | grep -q .; \
-    then phpstan analyse --memory-limit=-1; else echo 'No custom code to analyse yet.'; fi";
+/// File types each tool checks. PHPCS's list also fills phpcs.xml.dist;
+/// PHPStan's matches phpstan-drupal's fileExtensions.
+const LINT_EXTENSIONS: &[&str] = &["php", "module", "inc", "install", "test", "profile", "theme", "info", "yml"];
+const ANALYSE_EXTENSIONS: &[&str] = &["php", "module", "inc", "install", "theme", "profile"];
+
+/// PHPStan exits 1 and PHPCS 4 exits 16 when they find no files, which every
+/// fresh site hits, so each tool runs only once matching custom code exists.
+fn when_custom_code(extensions: &[&str], command: &str) -> String {
+    let names = extensions
+        .iter()
+        .map(|e| format!("-name '*.{e}'"))
+        .collect::<Vec<_>>()
+        .join(" -o ");
+    format!(
+        "if find web/modules/custom web/themes/custom -type f \\( {names} \\) | grep -q .; \
+         then {command}; else echo 'No custom code to check yet.'; fi"
+    )
+}
 
 pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     let r = &p.release;
@@ -127,9 +140,24 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
         .retry(Retry::StartOver { reason: "create-project needs an empty folder.".into() }),
     ];
 
-    if !r.includes_drush {
+    for (key, value) in &r.composer_config {
+        steps.push(step(
+            format!("composer-config:{key}"),
+            format!("Set Composer {key} to {value}"),
+            ddev(&["composer", "config", key, value]),
+            MIN,
+        ));
+    }
+    if !r.reinstall.is_empty() {
+        let mut args = vec!["composer", "reinstall"];
+        args.extend(r.reinstall.iter().map(String::as_str));
+        args.push("-n");
+        steps.push(step("reinstall", format!("Reinstall {}", r.reinstall.join(", ")), ddev(&args), 10 * MIN));
+    }
+
+    if let Some(drush) = &r.drush_package {
         steps.push(
-            step("drush", "Add Drush", ddev(&["composer", "require", "drush/drush", "-n"]), 10 * MIN)
+            step("drush", "Add Drush", ddev(&["composer", "require", drush, "-n"]), 10 * MIN)
                 .check(contains("composer.json", "\"drush/drush\"")),
         );
     }
@@ -151,7 +179,7 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
                 "composer",
                 "require",
                 "--dev",
-                &format!("drupal/core-dev:^{}", r.core_major),
+                &r.dev_package,
                 "--with-all-dependencies",
                 "-n",
             ]),
@@ -173,7 +201,11 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     steps.push(step("ddev-restart", "Restart DDEV", ddev(&["restart"]), 10 * MIN));
 
     let files = [
-        ("phpcs.xml.dist", include_str!("../resources/templates/phpcs.xml.dist").to_string()),
+        (
+            "phpcs.xml.dist",
+            include_str!("../resources/templates/phpcs.xml.dist")
+                .replace("{{EXTENSIONS}}", &LINT_EXTENSIONS.join(",")),
+        ),
         ("phpstan.neon", include_str!("../resources/templates/phpstan.neon").to_string()),
         (
             "phpunit.xml",
@@ -193,14 +225,14 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     }
 
     for (name, command) in [
-        ("lint", "phpcs"),
-        ("analyse", ANALYSE),
-        ("test", "phpunit"),
+        ("lint", when_custom_code(LINT_EXTENSIONS, "phpcs")),
+        ("analyse", when_custom_code(ANALYSE_EXTENSIONS, "phpstan analyse --memory-limit=-1")),
+        ("test", "phpunit".to_string()),
     ] {
         steps.push(step(
             format!("script:{name}"),
             format!("Add the composer {name} script"),
-            ddev(&["composer", "config", &format!("scripts.{name}"), command]),
+            ddev(&["composer", "config", &format!("scripts.{name}"), &command]),
             MIN,
         ));
     }
@@ -337,6 +369,15 @@ mod tests {
     #[test]
     fn drupal11_defaults() {
         snapshot("drupal11", |_| {});
+    }
+
+    #[test]
+    fn drupal12_preview() {
+        snapshot("drupal12", |i| {
+            i.drupal = "12".into();
+            i.php = "8.5".into();
+            i.database = Database { kind: DbType::Postgres, version: "18".into() };
+        });
     }
 
     #[test]

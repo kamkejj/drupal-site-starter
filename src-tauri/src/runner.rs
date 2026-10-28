@@ -371,8 +371,15 @@ mod smoke {
         let mut i = input(&parent);
         i.drupal = std::env::var("SMOKE_DRUPAL").unwrap_or_else(|_| "11".into());
         i.name = std::env::var("SMOKE_NAME").unwrap_or_else(|_| format!("ddevcreator-smoke-{}", i.drupal));
-        i.services = vec!["mailpit".into(), "adminer".into(), "redis".into()];
         let compat = Compat::bundled();
+        let release = compat.release(&i.drupal).expect("SMOKE_DRUPAL names a release");
+        i.php = release.default_php.clone();
+        i.database = release.default_database.clone();
+        i.services = std::env::var("SMOKE_SERVICES")
+            .unwrap_or_else(|_| "mailpit,adminer,redis".into())
+            .split(',')
+            .map(String::from)
+            .collect();
         let p = parse(&i, &compat).unwrap();
         let steps = crate::steps::build(&p, &compat);
         let exec = NativeExecutor { path: crate::env::login_shell_path() };

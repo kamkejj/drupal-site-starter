@@ -33,7 +33,10 @@
   };
   const DB_LABEL: Record<DbType, string> = { mariadb: "MariaDB", mysql: "MySQL", postgres: "PostgreSQL" };
 
-  const seed = untrack(() => ({ first: compat.drupal[0], defaults: $state.snapshot(settings) }));
+  const seed = untrack(() => ({
+    first: compat.drupal.find((r) => r.status === "supported") ?? compat.drupal[0],
+    defaults: $state.snapshot(settings),
+  }));
   const first = seed.first;
   let stepIndex = $state(0);
   let displayName = $state("");
@@ -183,7 +186,7 @@
         />
       </label>
     {:else if STEPS[stepIndex] === "Drupal and PHP"}
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {#each compat.drupal as r (r.id)}
           <button
             class="rounded-lg border p-4 text-left {input.drupal === r.id
@@ -195,6 +198,8 @@
             <div class="mt-1 font-mono text-xs text-slate-500">{r.package}</div>
             {#if r.status === "ending-soon"}
               <div class="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Ending soon</div>
+            {:else if r.status === "preview"}
+              <div class="mt-2 inline-block rounded bg-violet-100 px-2 py-0.5 text-xs text-violet-800">Preview</div>
             {/if}
           </button>
         {/each}

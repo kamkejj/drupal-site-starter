@@ -31,6 +31,7 @@ pub struct Database {
 pub enum ReleaseStatus {
     Supported,
     EndingSoon,
+    Preview,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,9 +41,16 @@ pub struct DrupalRelease {
     pub label: String,
     pub package: String,
     pub ddev_type: String,
-    pub core_major: u32,
     pub install_profile: String,
-    pub includes_drush: bool,
+    /// `composer config` pairs applied right after create-project, in order.
+    #[serde(default)]
+    pub composer_config: Vec<(String, String)>,
+    /// Packages to reinstall after `composer_config`, such as core from source.
+    #[serde(default)]
+    pub reinstall: Vec<String>,
+    /// `None` when the project template already requires Drush.
+    pub drush_package: Option<String>,
+    pub dev_package: String,
     pub php: Vec<String>,
     pub default_php: String,
     pub databases: BTreeMap<DbType, Vec<String>>,
