@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import PasswordInput from "./PasswordInput.svelte";
   import { api, type AppSettings, type Compat } from "$lib/api";
 
   let {
@@ -49,15 +50,14 @@
     <label class="field"><span>Admin username</span><input class="input" bind:value={draft.adminName} /></label>
     <label class="field"><span>Admin email</span><input class="input" type="email" bind:value={draft.adminEmail} /></label>
   </div>
-  <label class="field">
-    <span>Admin password</span>
-    <input
-      class="input"
-      type="password"
+  <div class="field">
+    <label for="settings-admin-password">Admin password</label>
+    <PasswordInput
+      id="settings-admin-password"
       bind:value={password}
       placeholder={hasPassword ? "Saved in the keychain. Type to replace it." : "Stored in the OS keychain"}
     />
-  </label>
+  </div>
 
   <div class="field">
     <span>Projects folder</span>
