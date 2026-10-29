@@ -3,8 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Drupal Site Starter</title>
+    <script>
+      // Applies preferences before first paint so the wrong theme never flashes. src/lib/preferences.svelte.ts owns them after load.
+      {
+        let preferences = {};
+        try {
+          preferences = JSON.parse(localStorage.getItem("preferences")) ?? {};
+        } catch {}
+        const dark = preferences.appearance === "dark" || (preferences.appearance !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = (dark ? preferences.themes?.dark : preferences.themes?.light) ?? (dark ? "mocha" : "latte");
+        document.documentElement.dataset.textSize = preferences.textSize ?? "default";
+      }
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

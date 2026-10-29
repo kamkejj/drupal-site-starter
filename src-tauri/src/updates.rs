@@ -1,4 +1,4 @@
-//! Remote updates. Both come from the base URL in Settings: `compat.json`
+//! Remote updates. Both come from the base URL in Project defaults: `compat.json`
 //! for Drupal, PHP and service data, and `latest.json` for the app itself.
 //! Nothing is fetched until a URL is set. `compat.json` must come with a
 //! `compat.json.sig` made with the app's updater key, the same key that
@@ -17,7 +17,7 @@ pub fn endpoint(base: &str, file: &str) -> Result<String, String> {
         .iter()
         .any(|l| base == *l || base.starts_with(&format!("{l}:")) || base.starts_with(&format!("{l}/")));
     if base.is_empty() {
-        Err("Set an update URL in Settings first.".into())
+        Err("Set an update URL in Project defaults first.".into())
     } else if !(base.starts_with("https://") || local) || base.contains(char::is_whitespace) {
         Err("The update URL must start with https://.".into())
     } else {

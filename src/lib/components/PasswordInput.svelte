@@ -20,7 +20,7 @@
   />
   <button
     type="button"
-    class="group absolute inset-y-0 right-0 grid w-10 place-items-center text-slate-400 outline-none hover:text-slate-700 focus-visible:text-drop dark:hover:text-slate-200"
+    class="group absolute inset-y-0 right-0 grid w-11 place-items-center text-[var(--color-muted)] outline-none hover:text-[var(--color-ink)]"
     aria-label={label}
     aria-pressed={visible}
     onclick={() => (visible = !visible)}
@@ -37,7 +37,7 @@
       {/if}
     </svg>
     <span
-      class="pointer-events-none absolute right-0 bottom-full mb-1.5 rounded bg-slate-900 px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 dark:bg-slate-700"
+      class="pointer-events-none absolute right-0 bottom-full mb-1.5 rounded bg-[var(--color-terminal)] px-2 py-1 text-xs whitespace-nowrap text-[var(--color-terminal-ink)] opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
       aria-hidden="true">{label}</span
     >
   </button>

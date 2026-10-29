@@ -112,10 +112,15 @@
   }
 </script>
 
-<section class="card mx-auto max-w-2xl space-y-4">
-  <h2 class="text-lg font-semibold">Settings</h2>
+<section class="mx-auto max-w-2xl space-y-4" aria-labelledby="settings-heading">
+  <header class="screen-heading">
+    <h2 id="settings-heading">Project defaults</h2>
+    <p>Set the defaults used for new local Drupal projects.</p>
+  </header>
 
-  <div class="grid grid-cols-2 gap-4">
+  <div class="card space-y-5">
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <label class="field"><span>Admin username</span><input class="input" bind:value={draft.adminName} /></label>
     <label class="field"><span>Admin email</span><input class="input" type="email" bind:value={draft.adminEmail} /></label>
   </div>
@@ -129,32 +134,34 @@
   </div>
 
   <div class="field">
-    <span>Projects folder</span>
-    <div class="flex gap-2">
-      <input class="input flex-1" bind:value={draft.projectsDir} />
+    <label for="projects-folder">Projects folder</label>
+    <div class="flex flex-col gap-2 sm:flex-row">
+      <input id="projects-folder" class="input flex-1" bind:value={draft.projectsDir} />
       <button class="btn-ghost" onclick={pickFolder}>Choose…</button>
     </div>
   </div>
 
-  <div class="grid grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <label class="field"><span>Config sync path</span><input class="input" bind:value={draft.configSyncDir} /></label>
     <label class="field"><span>IDE command</span><input class="input" bind:value={draft.ide} /></label>
   </div>
 
   <div class="field">
     <label for="update-url">Update URL</label>
-    <div class="flex gap-2">
+    <div class="flex flex-col gap-2 sm:flex-row">
       <input id="update-url" class="input flex-1 font-mono" bind:value={draft.updateUrl} placeholder="https://example.com/drupal-site-starter" />
       <button class="btn-ghost" disabled={!draft.updateUrl.trim() || checking} onclick={checkUpdates}>
         {checking ? "Checking…" : "Check now"}
       </button>
     </div>
-    <small class="text-slate-500">
+    <small class="help">
       The app reads compat.json (Drupal, PHP and service data, revision {compat.revision}) and latest.json (app updates) from here. Leave it empty to never check.
     </small>
-    {#each updateNotes as note}<small class="text-slate-500">{note}</small>{/each}
+    <div role="status" aria-live="polite" class="space-y-1">
+      {#each updateNotes as note}<small class="help block">{note}</small>{/each}
+    </div>
     {#if appUpdate}
-      <div class="flex items-center justify-between rounded-md border border-drop/40 bg-drop/5 px-3 py-2 text-sm">
+      <div class="flex items-center justify-between rounded-md border border-[var(--color-primary)] bg-[var(--color-recessed)] px-3 py-2 text-sm">
         <span>Version {appUpdate.version} is available (you have {appUpdate.currentVersion}).</span>
         <button class="btn-primary" disabled={installing} onclick={installUpdate}>{installing ? "Installing…" : "Install and restart"}</button>
       </div>
@@ -166,9 +173,8 @@
     <div class="flex flex-wrap gap-2">
       {#each compat.services as s (s.id)}
         <button
-          class="rounded-full border px-3 py-1 text-xs {draft.services.includes(s.id)
-            ? 'border-drop bg-drop text-white'
-            : 'border-slate-300 dark:border-slate-700'}"
+          class="choice-tile min-h-11 rounded-full px-3 py-1 text-sm {draft.services.includes(s.id) ? 'is-selected' : ''}"
+          aria-pressed={draft.services.includes(s.id)}
           onclick={() => toggle(s.id)}>{s.label}</button
         >
       {/each}
@@ -184,19 +190,19 @@
       </div>
     </div>
     {#if presets.length}
-      <ul class="divide-y divide-slate-200 rounded-md border border-slate-200 text-sm dark:divide-slate-800 dark:border-slate-800">
+      <ul class="divide-y divide-[var(--color-divider)] rounded-md border border-[var(--color-divider)] text-sm">
         {#each presets as p (p.name)}
           {@const label = compat.drupal.find((r) => r.id === p.drupal)?.label ?? p.drupal}
           <li class="flex items-center justify-between px-3 py-2">
-            <span><span class="font-medium">{p.name}</span> <span class="text-xs text-slate-500">{label}, PHP {p.php}, {p.database.type} {p.database.version}</span></span>
-            <button class="text-xs text-red-600 hover:underline" onclick={() => presetAction(async () => void (presets = await api.deletePreset(p.name)))}>Delete</button>
+            <span><span class="font-medium">{p.name}</span> <span class="help text-xs">{label}, PHP {p.php}, {p.database.type} {p.database.version}</span></span>
+            <button class="text-xs text-[var(--color-danger)] hover:underline" onclick={() => presetAction(async () => void (presets = await api.deletePreset(p.name)))}>Delete</button>
           </li>
         {/each}
       </ul>
     {:else}
-      <small class="text-slate-500">Save a preset from the wizard's Review step, or import one.</small>
+      <small class="help">Save a preset from the wizard's Review step, or import one.</small>
     {/if}
-    {#if presetNotice}<small class="text-slate-500">{presetNotice}</small>{/if}
+    {#if presetNotice}<small class="help">{presetNotice}</small>{/if}
   </div>
 
   {#if error}<p class="error">{error}</p>{/if}
@@ -204,5 +210,6 @@
   <div class="flex justify-end gap-2">
     <button class="btn-ghost" onclick={onCancel}>Cancel</button>
     <button class="btn-primary" onclick={save}>Save</button>
+  </div>
   </div>
 </section>

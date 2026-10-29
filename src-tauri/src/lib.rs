@@ -330,7 +330,7 @@ async fn start_run(
     let password = match password.filter(|p| !p.is_empty()).or_else(|| settings::admin_password(&saved)) {
         Some(pw) => pw,
         None if !p.needs_password => String::new(),
-        None => return Err("Set an admin password in Settings or for this project.".into()),
+        None => return Err("Set an admin password in Project defaults or for this project.".into()),
     };
     let steps = p.steps;
     let state_path = run_state_file(&app, &p.name)?;
@@ -372,7 +372,7 @@ fn cancel_run(state: State<AppState>) {
 fn ide_program(ide: &str) -> Result<&str, String> {
     let ide = ide.trim();
     let valid = !ide.is_empty() && ide.chars().all(|c| c.is_ascii_alphanumeric() || "-_./".contains(c));
-    if valid { Ok(ide) } else { Err(format!("Set an IDE command in Settings, such as code or phpstorm (got {ide:?}).")) }
+    if valid { Ok(ide) } else { Err(format!("Set an IDE command in Project defaults, such as code or phpstorm (got {ide:?}).")) }
 }
 
 #[tauri::command]
@@ -447,7 +447,7 @@ async fn delete_project(app: AppHandle, state: State<'_, AppState>, job: Job) ->
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -488,7 +488,30 @@ pub fn run() {
             import_presets,
             export_presets,
             login_link,
-        ])
+        ]);
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(app_menu).on_menu_event(|app, event| {
+        if event.id() == APP_SETTINGS_MENU_ID {
+            let _ = tauri::Emitter::emit(app, "open-app-settings", ());
+        }
+    });
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(target_os = "macos")]
+const APP_SETTINGS_MENU_ID: &str = "app-settings";
+
+/// The default macOS menu with "Settings…" (⌘,) after About, where macOS apps put it.
+#[cfg(target_os = "macos")]
+fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+    let menu = Menu::default(app)?;
+    let items = menu.items()?;
+    if let Some(app_submenu) = items.first().and_then(|item| item.as_submenu()) {
+        app_submenu.insert(&MenuItem::with_id(app, APP_SETTINGS_MENU_ID, "Settings…", true, Some("CmdOrCtrl+,"))?, 2)?;
+        app_submenu.insert(&PredefinedMenuItem::separator(app)?, 3)?;
+    }
+    Ok(menu)
 }

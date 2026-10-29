@@ -15,30 +15,35 @@
     run();
   });
 
-  const icon = { ok: "✓", warn: "!", fail: "✕" };
-  const tone = {
-    ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    warn: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-    fail: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  const presentation: Record<CheckResult["level"], { icon: string; label: string; tone: string }> = {
+    ok: { icon: "✓", label: "Passed", tone: "status-ok" },
+    warn: { icon: "!", label: "Warning", tone: "status-warning" },
+    fail: { icon: "✕", label: "Failed", tone: "status-danger" },
   };
 </script>
 
-<section class="card mx-auto max-w-2xl">
-  <h2 class="text-lg font-semibold">Preflight</h2>
-  <p class="mt-1 text-sm text-slate-500">Checking that this machine can run DDEV.</p>
+<section class="mx-auto max-w-2xl" aria-busy={checks === null} aria-labelledby="preflight-heading">
+  <header class="screen-heading">
+    <h2 id="preflight-heading">Preflight</h2>
+    <p>Checking that this machine can run DDEV.</p>
+  </header>
 
-  <ul class="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+  <div class="card">
+  <p class="sr-only" role="status" aria-live="polite">
+    {checks === null ? "Running environment checks." : blocked ? "Environment checks need attention." : "Environment checks passed."}
+  </p>
+  <ul class="divide-y divide-[var(--color-divider)]">
     {#if checks === null}
-      <li class="py-3 text-sm text-slate-500">Running checks…</li>
+      <li class="py-3 text-sm help">Running checks…</li>
     {:else}
       {#each checks as c (c.id)}
         <li class="flex items-start gap-3 py-3">
-          <span class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold {tone[c.level]}">
-            {icon[c.level]}
+          <span class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-recessed)] text-xs font-bold {presentation[c.level].tone}" aria-hidden="true">
+            {presentation[c.level].icon}
           </span>
           <div class="text-sm">
-            <div class="font-medium">{c.label}</div>
-            <div class="text-slate-500">{c.detail}</div>
+            <div class="font-bold">{c.label} <span class="font-normal {presentation[c.level].tone}">{presentation[c.level].label}</span></div>
+            <div class="help">{c.detail}</div>
           </div>
         </li>
       {/each}
@@ -48,5 +53,6 @@
   <div class="mt-5 flex justify-end gap-2">
     <button class="btn-ghost" onclick={run} disabled={checks === null}>Check again</button>
     <button class="btn-primary" onclick={onContinue} disabled={blocked}>Continue</button>
+  </div>
   </div>
 </section>

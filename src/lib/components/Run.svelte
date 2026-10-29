@@ -22,7 +22,7 @@
   phase = "running";
   let logPath = $state("");
   let error = $state("");
-  let logEl: HTMLPreElement | undefined = $state();
+  let logEl: HTMLTextAreaElement | undefined = $state();
 
   const failed = $derived(
     Object.entries(statuses).find(([, s]) => s.status === "failed") as
@@ -32,6 +32,7 @@
   const doneCount = $derived(
     Object.values(statuses).filter((s) => s.status === "done" || s.status === "skipped").length,
   );
+  const logOutput = $derived(lines.map((line) => `${line.id.padEnd(16).slice(0, 16)} ${line.line}`).join("\n"));
 
   function onEvent(e: RunEvent) {
     if (e.type === "log") {
@@ -106,50 +107,51 @@
     },
   );
 
-  const icon = (s?: StepStatus) =>
-    !s ? "○" : s.status === "running" ? "◐" : s.status === "failed" ? "✕" : s.status === "skipped" ? "↷" : "✓";
-  const tone = (s?: StepStatus) =>
-    !s
-      ? "text-slate-400"
-      : s.status === "running"
-        ? "text-drop animate-pulse"
-        : s.status === "failed"
-          ? "text-red-600"
-          : "text-emerald-600";
+  const presentation: Record<StepStatus["status"], { icon: string; tone: string; label: string }> = {
+    running: { icon: "◐", tone: "text-[var(--color-primary)]", label: "Running" },
+    failed: { icon: "✕", tone: "status-danger", label: "Failed" },
+    skipped: { icon: "↷", tone: "status-warning", label: "Skipped" },
+    done: { icon: "✓", tone: "status-ok", label: "Done" },
+  };
+  const stepPresentation = (status?: StepStatus) => status ? presentation[status.status] : { icon: "○", tone: "text-[var(--color-border)]", label: "Waiting" };
 </script>
 
-<section class="grid h-[calc(100vh-7rem)] grid-cols-[18rem_minmax(0,1fr)] gap-4">
-  <aside class="card overflow-auto p-3">
-    <div class="mb-2 px-2 text-xs text-slate-500">
+<section class="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]" aria-labelledby="run-heading">
+  <aside class="card max-h-72 overflow-auto p-3 lg:max-h-none">
+    <div class="mb-2 px-2 text-sm text-[var(--color-muted)]" aria-label="Setup progress">
       {doneCount} of {plan?.steps.length ?? "…"} steps
     </div>
     <ol class="space-y-0.5 text-sm">
       {#each plan?.steps ?? [] as s (s.id)}
-        <li class="flex gap-2 rounded px-2 py-1 {statuses[s.id]?.status === 'running' ? 'bg-drop/10' : ''}">
-          <span class="w-4 shrink-0 text-center {tone(statuses[s.id])}">{icon(statuses[s.id])}</span>
+        <li class="flex gap-2 rounded px-2 py-2 {statuses[s.id]?.status === 'running' ? 'bg-[var(--color-recessed)]' : ''}">
+          <span class="w-4 shrink-0 text-center {stepPresentation(statuses[s.id]).tone}" aria-hidden="true">{stepPresentation(statuses[s.id]).icon}</span>
           <span class="truncate" title={s.title}>{s.title}</span>
+          <span class="sr-only">{stepPresentation(statuses[s.id]).label}</span>
         </li>
       {/each}
     </ol>
   </aside>
 
   <div class="flex min-h-0 flex-col gap-3">
-    <div class="card flex flex-wrap items-center justify-between gap-3 py-3">
+    <div class="card flex flex-wrap items-center justify-between gap-3 py-3" aria-busy={phase === "running"}>
       <div class="min-w-0 text-sm">
+        <h2 id="run-heading" class="sr-only">Project setup</h2>
+        <div role="status" aria-live="polite" aria-atomic="true">
         {#if phase === "running"}
           <span class="font-medium">{verb} {name}…</span>
         {:else if phase === "done"}
-          <span class="font-medium text-emerald-700">{name} is ready.</span>
+          <span class="font-medium status-ok">{name} is ready.</span>
         {:else if phase === "cancelled"}
-          <span class="font-medium text-amber-700">Cancelled.</span>
+          <span class="font-medium status-warning">Cancelled.</span>
         {:else}
-          <span class="font-medium text-red-700">Failed{failed ? `: ${failed[1].message}` : ""}</span>
+          <span class="font-medium status-danger">Failed{failed ? `: ${failed[1].message}` : ""}</span>
           {#if failed?.[1].retry.kind === "startOver"}
-            <div class="text-xs text-slate-500">{failed[1].retry.reason}</div>
+            <div class="text-xs help">{failed[1].retry.reason}</div>
           {/if}
         {/if}
-        {#if error}<div class="error">{error}</div>{/if}
-        {#if logPath && phase !== "running"}<div class="truncate text-xs text-slate-500">Log: {logPath}</div>{/if}
+        </div>
+        {#if error}<div class="error" role="alert">{error}</div>{/if}
+        {#if logPath && phase !== "running"}<div class="truncate text-xs text-[var(--color-muted)]">Log: {logPath}</div>{/if}
       </div>
       <div class="flex shrink-0 flex-wrap gap-2">
         {#if phase === "running"}
@@ -173,10 +175,12 @@
       </div>
     </div>
 
-    <pre
+    <textarea
       bind:this={logEl}
-      class="min-h-0 flex-1 overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-200">{#each lines as l}<span
-          class="text-slate-500">{l.id.padEnd(16).slice(0, 16)} </span>{l.line}
-{/each}</pre>
+      readonly
+      aria-label="Setup output"
+      aria-live="off"
+      class="terminal min-h-72 flex-1 resize-none p-4 font-mono text-xs leading-relaxed"
+      value={logOutput}></textarea>
   </div>
 </section>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import PasswordInput from "./PasswordInput.svelte";
   import {
@@ -21,10 +21,12 @@
     settings,
     hasPassword,
     onCreate,
+    runInProgress,
   }: {
     compat: Compat;
     settings: AppSettings;
     hasPassword: boolean;
+    runInProgress: boolean;
     onCreate: (input: ProjectInput, password: string | null) => void;
   } = $props();
 
@@ -197,7 +199,11 @@
 
   async function goTo(i: number) {
     stepIndex = i;
-    if (STEPS[i] !== "Review") return;
+    if (STEPS[i] !== "Review") {
+      await tick();
+      document.getElementById("wizard-heading")?.focus();
+      return;
+    }
     if (!input.siteName.trim()) input.siteName = displayName.trim();
     try {
       plan = await api.plan({ kind: "create", input });
@@ -205,7 +211,11 @@
     } catch (e) {
       plan = null;
       errors = fieldErrors(e);
-      if (errors.length) stepIndex = Math.min(...errors.map((x) => FIELD_STEP[x.field as keyof ProjectInput] ?? 0));
+      if (errors.length) {
+        stepIndex = Math.min(...errors.map((x) => FIELD_STEP[x.field as keyof ProjectInput] ?? 0));
+        await tick();
+        document.querySelector<HTMLElement>("#wizard [aria-invalid='true']")?.focus();
+      }
     }
   }
 
@@ -219,24 +229,27 @@
   const canCreate = $derived(plan !== null && !nameTaken && !portUser && (hasPassword || password.length > 0));
 </script>
 
-<section class="mx-auto max-w-3xl">
+<section id="wizard" class="mx-auto max-w-3xl" aria-labelledby="wizard-heading">
+  <header class="screen-heading">
+    <h2 id="wizard-heading" tabindex="-1">Create a Drupal project</h2>
+    <p>Configure the local environment, then review the generated DDEV project before creating it.</p>
+  </header>
   {#if presets.length}
     <div class="mb-4 flex items-center gap-2 text-sm">
-      <label for="preset" class="text-slate-500">Start from preset</label>
+      <label for="preset" class="help">Start from preset</label>
       <select id="preset" class="input w-auto" value={presetName} onchange={(e) => applyPreset(e.currentTarget.value)}>
         <option value="">None</option>
         {#each presets as p (p.name)}<option value={p.name}>{p.name}</option>{/each}
       </select>
-      {#if presetNote}<span class="text-xs text-amber-700">{presetNote}</span>{/if}
+      {#if presetNote}<span class="text-xs text-[var(--color-warning)]">{presetNote}</span>{/if}
     </div>
   {/if}
-  <ol class="mb-5 flex gap-1 text-xs">
+  <ol class="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Site setup progress">
     {#each STEPS as label, i (label)}
       <li class="flex-1">
         <button
-          class="w-full border-b-2 pb-2 text-left {i === stepIndex
-            ? 'border-drop font-semibold text-drop'
-            : 'border-slate-200 text-slate-500 dark:border-slate-800'}"
+          class="choice-tile min-h-11 w-full px-3 py-2 text-left text-sm {i === stepIndex ? 'is-selected' : ''}"
+          aria-current={i === stepIndex ? "step" : undefined}
           onclick={() => goTo(i)}>{i + 1}. {label}</button
         >
       </li>
@@ -247,35 +260,35 @@
     {#if STEPS[stepIndex] === "Project"}
       <label class="field">
         <span>Project name</span>
-        <input class="input" bind:value={displayName} placeholder="My new site" />
+        <input class="input" bind:value={displayName} placeholder="My new site" aria-invalid={errorFor("name") || nameTaken ? "true" : undefined} aria-describedby={[input.name ? "project-hostname" : "", nameTaken ? "project-name-taken" : "", errorFor("name") ? "project-name-error" : ""].filter(Boolean).join(" ") || undefined} />
         {#if input.name}
-          <small class="text-slate-500">https://{input.name}.ddev.site</small>
+          <small id="project-hostname" class="help">https://{input.name}.ddev.site</small>
         {/if}
-        {#if nameTaken}<small class="error">A DDEV project named {input.name} already exists.</small>{/if}
-        {#if errorFor("name")}<small class="error">{errorFor("name")}</small>{/if}
+        {#if nameTaken}<small id="project-name-taken" class="error">A DDEV project named {input.name} already exists.</small>{/if}
+        {#if errorFor("name")}<small id="project-name-error" class="error">{errorFor("name")}</small>{/if}
       </label>
       <label class="field">
         <span>Site name</span>
-        <input class="input" bind:value={input.siteName} placeholder={displayName || "My Site"} />
-        {#if errorFor("siteName")}<small class="error">{errorFor("siteName")}</small>{/if}
+        <input class="input" bind:value={input.siteName} placeholder={displayName || "My Site"} aria-invalid={errorFor("siteName") ? "true" : undefined} aria-describedby={errorFor("siteName") ? "site-name-error" : undefined} />
+        {#if errorFor("siteName")}<small id="site-name-error" class="error">{errorFor("siteName")}</small>{/if}
       </label>
       <div class="field">
-        <span>Location</span>
-        <div class="flex gap-2">
-          <input class="input flex-1" bind:value={input.parentDir} />
+        <label for="project-location">Location</label>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <input id="project-location" class="input flex-1" bind:value={input.parentDir} aria-invalid={errorFor("parentDir") ? "true" : undefined} aria-describedby={errorFor("parentDir") ? "project-location-help project-location-error" : "project-location-help"} />
           <button class="btn-ghost" onclick={pickParent}>Choose…</button>
         </div>
-        <small class="text-slate-500">Creates {input.parentDir}/{input.name || "…"}</small>
-        {#if errorFor("parentDir")}<small class="error">{errorFor("parentDir")}</small>{/if}
+        <small id="project-location-help" class="help">Creates {input.parentDir}/{input.name || "…"}</small>
+        {#if errorFor("parentDir")}<small id="project-location-error" class="error">{errorFor("parentDir")}</small>{/if}
       </div>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label class="field">
-          <span>Admin username</span><input class="input" bind:value={input.adminName} />
-          {#if errorFor("adminName")}<small class="error">{errorFor("adminName")}</small>{/if}
+          <span>Admin username</span><input class="input" bind:value={input.adminName} aria-invalid={errorFor("adminName") ? "true" : undefined} aria-describedby={errorFor("adminName") ? "admin-name-error" : undefined} />
+          {#if errorFor("adminName")}<small id="admin-name-error" class="error">{errorFor("adminName")}</small>{/if}
         </label>
         <label class="field">
-          <span>Admin email</span><input class="input" bind:value={input.adminEmail} />
-          {#if errorFor("adminEmail")}<small class="error">{errorFor("adminEmail")}</small>{/if}
+          <span>Admin email</span><input class="input" bind:value={input.adminEmail} aria-invalid={errorFor("adminEmail") ? "true" : undefined} aria-describedby={errorFor("adminEmail") ? "admin-email-error" : undefined} />
+          {#if errorFor("adminEmail")}<small id="admin-email-error" class="error">{errorFor("adminEmail")}</small>{/if}
         </label>
       </div>
       <div class="field">
@@ -287,25 +300,24 @@
         />
       </div>
     {:else if STEPS[stepIndex] === "Drupal and PHP"}
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {#each compat.drupal as r (r.id)}
           <button
-            class="rounded-lg border p-4 text-left {input.drupal === r.id
-              ? 'border-drop ring-2 ring-drop/30'
-              : 'border-slate-200 dark:border-slate-700'}"
+            class="choice-tile {input.drupal === r.id ? 'is-selected' : ''}"
+            aria-pressed={input.drupal === r.id}
             onclick={() => chooseRelease(r.id)}
           >
             <div class="font-semibold">{r.label}</div>
-            <div class="mt-1 font-mono text-xs text-slate-500">{r.package}</div>
+            <div class="choice-detail font-mono">{r.package}</div>
             {#if r.status === "ending-soon"}
-              <div class="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Ending soon</div>
+              <div class="mt-2 inline-block rounded bg-[var(--color-recessed)] px-2 py-0.5 text-xs text-[var(--color-warning)]">Ending soon</div>
             {:else if r.status === "preview"}
-              <div class="mt-2 inline-block rounded bg-violet-100 px-2 py-0.5 text-xs text-violet-800">Preview</div>
+              <div class="mt-2 inline-block rounded bg-[var(--color-recessed)] px-2 py-0.5 text-xs text-[var(--color-primary-strong)]">Preview</div>
             {/if}
           </button>
         {/each}
       </div>
-      {#if release.statusNote}<p class="text-sm text-amber-700">{release.statusNote}</p>{/if}
+      {#if release.statusNote}<p class="text-sm text-[var(--color-warning)]">{release.statusNote}</p>{/if}
       <label class="field">
         <span>PHP version</span>
         <select class="input" bind:value={input.php}>
@@ -325,17 +337,17 @@
       </div>
       <label class="field">
         <span>HTTPS port (optional)</span>
-        <input class="input" type="number" min="1024" max="65535" step="1" placeholder="Use the shared router port" bind:value={input.httpsPort} />
-        <small class="text-slate-500">
+        <input class="input" type="number" min="1024" max="65535" step="1" placeholder="Use the shared router port" bind:value={input.httpsPort} aria-invalid={portUser || errorFor("httpsPort") ? "true" : undefined} aria-describedby={["https-port-help", portUser ? "https-port-used" : "", errorFor("httpsPort") ? "https-port-error" : ""].filter(Boolean).join(" ")} />
+        <small id="https-port-help" class="help">
           Use a port from 30000 to 30500. The site opens at https://{input.name || "NAME"}.ddev.site:{input.httpsPort ?? "PORT"}.
         </small>
-        {#if portUser}<small class="error">Port {input.httpsPort} is already used by {portUser}.</small>{/if}
-        {#if errorFor("httpsPort")}<small class="error">{errorFor("httpsPort")}</small>{/if}
+        {#if portUser}<small id="https-port-used" class="error">Port {input.httpsPort} is already used by {portUser}.</small>{/if}
+        {#if errorFor("httpsPort")}<small id="https-port-error" class="error">{errorFor("httpsPort")}</small>{/if}
       </label>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label class="field">
           <span>Database</span>
-          <select class="input" value={input.database.type} onchange={(e) => chooseDbType(e.currentTarget.value as DbType)}>
+          <select class="input" value={input.database.type} onchange={(e) => chooseDbType(e.currentTarget.value as DbType)} aria-invalid={errorFor("database") ? "true" : undefined} aria-describedby={errorFor("database") ? "database-error" : undefined}>
             {#each dbTypes as t (t)}<option value={t}>{DB_LABEL[t]}</option>{/each}
           </select>
         </label>
@@ -347,32 +359,31 @@
         </label>
       </div>
       {#if input.database.type === "postgres"}
-        <p class="text-sm text-amber-700">Some contributed modules don't fully support PostgreSQL.</p>
+        <p class="text-sm text-[var(--color-warning)]">Some contributed modules don't fully support PostgreSQL.</p>
       {/if}
-      {#if errorFor("database")}<p class="error">{errorFor("database")}</p>{/if}
+      {#if errorFor("database")}<p id="database-error" class="error">{errorFor("database")}</p>{/if}
       <label class="field">
         <span>Config sync directory (relative to web/)</span>
-        <input class="input" bind:value={input.configSyncDir} />
-        {#if errorFor("configSyncDir")}<small class="error">{errorFor("configSyncDir")}</small>{/if}
+        <input class="input" bind:value={input.configSyncDir} aria-invalid={errorFor("configSyncDir") ? "true" : undefined} aria-describedby={errorFor("configSyncDir") ? "config-sync-error" : undefined} />
+        {#if errorFor("configSyncDir")}<small id="config-sync-error" class="error">{errorFor("configSyncDir")}</small>{/if}
       </label>
     {:else if STEPS[stepIndex] === "Services"}
       <div class="flex items-center justify-between">
         <span class="text-sm font-medium">Services</span>
-        <button class="text-xs text-drop hover:underline" onclick={() => (input.services = [...(activePreset?.services ?? settings.services)])}>
+        <button class="text-xs text-[var(--color-primary-strong)] hover:underline" onclick={() => (input.services = [...(activePreset?.services ?? settings.services)])}>
           Reset to preset
         </button>
       </div>
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {#each compat.services as s (s.id)}
           {@const on = input.services.includes(s.id)}
           <button
-            class="flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm {on
-              ? 'border-drop bg-drop/5'
-              : 'border-slate-200 dark:border-slate-700'}"
+            class="choice-tile flex min-h-11 items-center justify-between px-3 py-2 text-sm {on ? 'is-selected' : ''}"
+            aria-pressed={on}
             onclick={() => toggleService(s.id)}
           >
             <span class="font-medium">{s.label}</span>
-            <span class="text-xs text-slate-500">
+            <span class="text-xs text-[var(--color-muted)]">
               {s.wiring.kind === "module" ? "Wired into Drupal" : s.wiring.kind === "containerOnly" ? "Container only" : ""}
               {on ? " ✓" : ""}
             </span>
@@ -382,51 +393,53 @@
       {#if bundles.length}
         <div class="space-y-2">
           <span class="text-sm font-medium">Module bundles</span>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {#each bundles as b (b.id)}
               {@const on = input.bundles.includes(b.id)}
               <button
-                class="rounded-md border px-3 py-2 text-left text-sm {on ? 'border-drop bg-drop/5' : 'border-slate-200 dark:border-slate-700'}"
+                class="choice-tile {on ? 'is-selected' : ''}"
                 aria-pressed={on}
+                aria-describedby={errorFor("bundles") ? "bundles-error" : undefined}
                 onclick={() => toggle("bundles", b.id)}
               >
                 <span class="font-medium">{b.label}{on ? " ✓" : ""}</span>
-                <span class="block text-xs text-slate-500">{b.description}</span>
+                <span class="choice-detail">{b.description}</span>
               </button>
             {/each}
           </div>
-          {#if errorFor("bundles")}<p class="error">{errorFor("bundles")}</p>{/if}
+          {#if errorFor("bundles")}<p id="bundles-error" class="error">{errorFor("bundles")}</p>{/if}
         </div>
       {/if}
       {#if recipes.length}
         <div class="space-y-2">
           <span class="text-sm font-medium">Recipes</span>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {#each recipes as r (r.id)}
               {@const on = input.recipes.includes(r.id)}
               <button
-                class="rounded-md border px-3 py-2 text-left text-sm {on ? 'border-drop bg-drop/5' : 'border-slate-200 dark:border-slate-700'}"
+                class="choice-tile {on ? 'is-selected' : ''}"
                 aria-pressed={on}
+                aria-describedby={errorFor("recipes") ? "recipes-error" : undefined}
                 onclick={() => toggle("recipes", r.id)}
               >
                 <span class="font-medium">{r.label}{on ? " ✓" : ""}</span>
-                <span class="block text-xs text-slate-500">{r.description}</span>
+                <span class="choice-detail">{r.description}</span>
               </button>
             {/each}
           </div>
-          {#if errorFor("recipes")}<p class="error">{errorFor("recipes")}</p>{/if}
+          {#if errorFor("recipes")}<p id="recipes-error" class="error">{errorFor("recipes")}</p>{/if}
         </div>
       {:else}
-        <p class="text-xs text-slate-500">Recipes need Drupal 11 or Drupal CMS.</p>
+        <p class="help text-sm">Recipes need Drupal 11 or Drupal CMS.</p>
       {/if}
       <label class="field">
         <span>Extra modules to enable</span>
-        <input class="input" value={extraText} oninput={(e) => setExtraModules(e.currentTarget.value)} placeholder="media, admin_toolbar_search" />
-        <small class="text-slate-500">
+        <input class="input" value={extraText} oninput={(e) => setExtraModules(e.currentTarget.value)} placeholder="media, admin_toolbar_search" aria-invalid={errorFor("extraModules") ? "true" : undefined} aria-describedby={errorFor("extraModules") ? "extra-modules-help extra-modules-error" : "extra-modules-help"} />
+        <small id="extra-modules-help" class="help">
           Machine names of modules already in the codebase, such as core modules or ones from a bundle, separated by commas. They're
           enabled after install; nothing is downloaded.
         </small>
-        {#if errorFor("extraModules")}<small class="error">{errorFor("extraModules")}</small>{/if}
+        {#if errorFor("extraModules")}<small id="extra-modules-error" class="error">{errorFor("extraModules")}</small>{/if}
       </label>
       <label class="field">
         <span>CI pipeline</span>
@@ -434,12 +447,12 @@
           {#each CI_OPTIONS as [value, label] (value)}<option {value}>{label}</option>{/each}
         </select>
         {#if input.ci === "gitlab"}
-          <small class="text-slate-500">Runs lint, analyse and unit tests in a PHP image. Kernel and functional tests stay local.</small>
+          <small class="help">Runs lint, analyse and unit tests in a PHP image. Kernel and functional tests stay local.</small>
         {:else if input.ci === "github"}
-          <small class="text-slate-500">Runs ddev composer lint, analyse and test with DDEV's GitHub action.</small>
+          <small class="help">Runs ddev composer lint, analyse and test with DDEV's GitHub action.</small>
         {/if}
       </label>
-      <p class="text-xs text-slate-500">
+      <p class="text-xs help">
         Always included: drupal/core-dev with PHPUnit, PHPCS (Drupal and DrupalPractice) and PHPStan, plus
         <code>composer lint</code>, <code>composer analyse</code> and <code>composer test</code>.
       </p>
@@ -450,16 +463,16 @@
         <input type="checkbox" bind:checked={input.initGit} /> Initialize a Git repository
       </label>
     {:else if plan}
-      <dl class="grid grid-cols-[10rem_1fr] gap-y-1 text-sm">
-        <dt class="text-slate-500">Folder</dt><dd class="font-mono">{plan.dir}</dd>
-        <dt class="text-slate-500">Hostname</dt><dd class="font-mono">{input.name}.ddev.site</dd>
+      <dl class="grid grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)] gap-y-2 text-sm">
+        <dt class="help">Folder</dt><dd class="font-mono">{plan.dir}</dd>
+        <dt class="help">Hostname</dt><dd class="font-mono">{input.name}.ddev.site</dd>
         {#if input.httpsPort != null}
-          <dt class="text-slate-500">URL</dt><dd class="font-mono">https://{input.name}.ddev.site:{input.httpsPort}</dd>
+          <dt class="help">URL</dt><dd class="font-mono">https://{input.name}.ddev.site:{input.httpsPort}</dd>
         {/if}
-        <dt class="text-slate-500">Drupal</dt><dd>{release.label}, PHP {input.php}</dd>
-        <dt class="text-slate-500">Stack</dt><dd>{input.webserver}, {DB_LABEL[input.database.type]} {input.database.version}</dd>
+        <dt class="help">Drupal</dt><dd>{release.label}, PHP {input.php}</dd>
+        <dt class="help">Stack</dt><dd>{input.webserver}, {DB_LABEL[input.database.type]} {input.database.version}</dd>
         {#if input.bundles.length || input.recipes.length}
-          <dt class="text-slate-500">Add-ons</dt>
+          <dt class="help">Add-ons</dt>
           <dd>
             {[
               ...compat.bundles.filter((b) => input.bundles.includes(b.id)).map((b) => b.label),
@@ -468,42 +481,45 @@
           </dd>
         {/if}
         {#if input.extraModules.length}
-          <dt class="text-slate-500">Extra modules</dt><dd class="font-mono">{input.extraModules.join(", ")}</dd>
+          <dt class="help">Extra modules</dt><dd class="font-mono">{input.extraModules.join(", ")}</dd>
         {/if}
         {#if input.ci !== "none"}
-          <dt class="text-slate-500">CI</dt><dd>{CI_OPTIONS.find(([v]) => v === input.ci)?.[1]}</dd>
+          <dt class="help">CI</dt><dd>{CI_OPTIONS.find(([v]) => v === input.ci)?.[1]}</dd>
         {/if}
-        <dt class="text-slate-500">Steps</dt><dd>{plan.steps.length}</dd>
+        <dt class="help">Steps</dt><dd>{plan.steps.length}</dd>
       </dl>
-      {#if plan.folderWarning}<p class="text-sm text-amber-700">{plan.folderWarning}</p>{/if}
+      {#if plan.folderWarning}<p class="text-sm text-[var(--color-warning)]">{plan.folderWarning}</p>{/if}
       {#if nameTaken}<p class="error">A DDEV project named {input.name} already exists.</p>{/if}
       {#if portUser}<p class="error">Port {input.httpsPort} is already used by {portUser}.</p>{/if}
       {#if !hasPassword && !password}<p class="error">Enter an admin password on the Project step.</p>{/if}
-      <div class="flex gap-2">
+      <div class="flex flex-col gap-2 sm:flex-row">
         <button class="btn-ghost" onclick={() => (showScript = !showScript)}>
           {showScript ? "Hide" : "Show"} commands
         </button>
         <button class="btn-ghost" onclick={exportScript}>Export as script…</button>
       </div>
-      <div class="flex gap-2">
-        <input class="input flex-1" bind:value={newPresetName} placeholder="Name these choices to reuse them" />
+      <div class="flex flex-col gap-2 sm:flex-row">
+        <input id="preset-name" class="input flex-1" bind:value={newPresetName} placeholder="Name these choices to reuse them" aria-label="Preset name" />
         <button class="btn-ghost" disabled={!newPresetName.trim()} onclick={savePreset}>Save as preset</button>
       </div>
-      {#if notice}<p class="text-xs text-emerald-700">{notice}</p>{/if}
+      {#if notice}<p class="text-xs status-ok">{notice}</p>{/if}
       {#if showScript}
-        <pre class="max-h-80 overflow-auto rounded-md bg-slate-950 p-3 text-xs text-slate-100">{plan.script}</pre>
+        <pre class="max-h-80 overflow-auto rounded-md terminal p-3 text-xs text-[var(--color-terminal-ink)]">{plan.script}</pre>
       {/if}
     {:else}
-      <p class="text-sm text-slate-500">Fix the highlighted fields to continue.</p>
+      <p class="text-sm help">Fix the highlighted fields to continue.</p>
     {/if}
   </div>
 
   <div class="mt-4 flex justify-between">
     <button class="btn-ghost" onclick={() => goTo(stepIndex - 1)} disabled={stepIndex === 0}>Back</button>
     {#if STEPS[stepIndex] === "Review"}
-      <button class="btn-primary" disabled={!canCreate} onclick={() => onCreate($state.snapshot(input), password || null)}>
-        Create site
-      </button>
+      <div class="flex items-center gap-3">
+        {#if runInProgress}<span class="help text-sm">Another setup is running. Start this one when it finishes.</span>{/if}
+        <button class="btn-primary" disabled={!canCreate || runInProgress} onclick={() => onCreate($state.snapshot(input), password || null)}>
+          Create site
+        </button>
+      </div>
     {:else}
       <button class="btn-primary" onclick={() => goTo(stepIndex + 1)}>Next</button>
     {/if}

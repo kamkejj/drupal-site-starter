@@ -9,6 +9,8 @@ export type Options = {
   remoteRevision?: number;
   appUpdate?: { version: string; currentVersion: string; notes: string | null } | null;
   presets?: Record<string, unknown>[];
+  /** Leaves `start_run` on its first step so a test can act during a run. */
+  holdRun?: boolean;
 };
 
 /**
@@ -97,6 +99,10 @@ export async function fakeBackend(page: Page, options: Options = {}) {
         start_run: ({ job, onEvent }) => {
           const ids = stepsFor(job);
           let n = 0;
+          if (options.holdRun) {
+            send(onEvent, n, { type: "step", id: ids[0], status: "running" });
+            return "/tmp/run.log";
+          }
           for (const id of ids) {
             send(onEvent, n++, { type: "step", id, status: "running" });
             send(onEvent, n++, { type: "log", id, line: `ran ${id}` });

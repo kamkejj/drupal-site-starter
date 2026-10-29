@@ -62,11 +62,11 @@
   load();
 </script>
 
-<section class="mx-auto max-w-4xl space-y-4">
+<section class="mx-auto max-w-4xl space-y-4" aria-labelledby="sites-heading" aria-busy={sites === null}>
   <div class="flex items-center justify-between">
-    <div>
-      <h2 class="text-lg font-semibold">Sites</h2>
-      <p class="text-sm text-slate-500">Every project DDEV knows about on this machine.</p>
+    <div class="screen-heading mb-0">
+      <h2 id="sites-heading">Sites</h2>
+      <p>Every project DDEV knows about on this machine.</p>
     </div>
     <div class="flex gap-2">
       <button class="btn-ghost" onclick={load}>Refresh</button>
@@ -74,27 +74,27 @@
     </div>
   </div>
 
-  {#if loadError}<p class="error">{loadError}</p>{/if}
+  {#if loadError}<p class="error" role="alert">{loadError}</p>{/if}
 
   {#if sites === null}
-    <p class="text-sm text-slate-500">Reading ddev list…</p>
+    <p class="help" role="status">Reading ddev list…</p>
   {:else if sites.length === 0}
-    <div class="card text-sm text-slate-500">DDEV has no projects yet.</div>
+    <div class="card help">DDEV has no projects yet.</div>
   {:else}
-    <ul class="space-y-3">
+    <ul class="overflow-hidden rounded-2xl border border-[var(--color-divider)] bg-[var(--color-panel)]">
       {#each sites as s (s.name)}
-        <li class="card space-y-3 py-4">
+        <li class="space-y-3 border-b border-[var(--color-divider)] p-4 last:border-b-0">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <span
-                  class="size-2 rounded-full {s.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'}"
-                  title={s.status}
+                  class="size-2 rounded-full {s.status === 'running' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-border)]'}"
+                  aria-hidden="true"
                 ></span>
                 <span class="font-medium">{s.name}</span>
-                <span class="text-xs text-slate-500">{s.kind} · {busy[s.name] ? "working…" : s.status}</span>
+                <span class="help text-xs">{s.kind} · {busy[s.name] ? "working…" : s.status}</span>
               </div>
-              <button class="truncate text-xs text-slate-500 hover:text-drop" onclick={() => revealItemInDir(s.dir)}>
+              <button class="block max-w-full truncate text-left text-xs text-[var(--color-muted)] underline-offset-2 hover:underline" onclick={() => revealItemInDir(s.dir)}>
                 {s.dir}
               </button>
             </div>
@@ -114,10 +114,9 @@
             {/each}
           </div>
           {#if notes[s.name]}
-            <pre
-              class="whitespace-pre-wrap text-xs {notes[s.name].ok
-                ? 'text-emerald-700 dark:text-emerald-400'
-                : 'error'}">{notes[s.name].text}</pre>
+            <p
+              class="whitespace-pre-wrap text-sm {notes[s.name].ok ? 'status-ok' : 'error'}"
+              role={notes[s.name].ok ? "status" : "alert"}>{notes[s.name].text}</p>
           {/if}
         </li>
       {/each}
