@@ -33,7 +33,7 @@
     name: 0, parentDir: 0, siteName: 0, adminName: 0, adminEmail: 0,
     drupal: 1, php: 1,
     webserver: 2, httpsPort: 2, database: 2, configSyncDir: 2,
-    services: 3, bundles: 3, recipes: 3, ci: 3, exportConfigOnInstall: 3, initGit: 3,
+    services: 3, bundles: 3, recipes: 3, extraModules: 3, ci: 3, exportConfigOnInstall: 3, initGit: 3,
   };
   const CI_OPTIONS: [Ci, string][] = [["none", "None"], ["github", "GitHub Actions"], ["gitlab", "GitLab CI"]];
   const DB_LABEL: Record<DbType, string> = { mariadb: "MariaDB", mysql: "MySQL", postgres: "PostgreSQL" };
@@ -51,6 +51,7 @@
   let errors = $state<FieldError[]>([]);
   let showScript = $state(false);
   let notice = $state("");
+  let extraText = $state("");
 
   let input = $state<ProjectInput>({
     name: "",
@@ -62,6 +63,7 @@
     services: [...seed.defaults.services],
     bundles: [],
     recipes: [],
+    extraModules: [],
     ci: "none",
     adminName: seed.defaults.adminName,
     adminEmail: seed.defaults.adminEmail,
@@ -103,6 +105,7 @@
     input.services = keep(p.services, compat.services, (id) => compat.services.some((s) => s.id === id));
     input.bundles = keep(p.bundles ?? [], compat.bundles, (id) => compat.bundles.some((b) => b.id === id && availableFor(b, r.id)));
     input.recipes = keep(p.recipes ?? [], compat.recipes, (id) => compat.recipes.some((x) => x.id === id && availableFor(x, r.id)));
+    setExtraModules((p.extraModules ?? []).join(", "));
     input.ci = p.ci ?? "none";
     input.configSyncDir = p.configSyncDir;
     input.exportConfigOnInstall = p.exportConfigOnInstall;
@@ -114,12 +117,12 @@
   }
 
   async function savePreset() {
-    const { drupal, php, webserver, database, services, bundles, recipes, ci, configSyncDir, exportConfigOnInstall, initGit } =
+    const { drupal, php, webserver, database, services, bundles, recipes, extraModules, ci, configSyncDir, exportConfigOnInstall, initGit } =
       $state.snapshot(input);
     const name = newPresetName.trim();
     try {
       presets = await api.savePreset({
-        name, drupal, php, webserver, database, services, bundles, recipes, ci, configSyncDir, exportConfigOnInstall, initGit,
+        name, drupal, php, webserver, database, services, bundles, recipes, extraModules, ci, configSyncDir, exportConfigOnInstall, initGit,
       });
       presetName = name;
       newPresetName = "";
@@ -165,6 +168,11 @@
 
   function toggle(list: "bundles" | "recipes", id: string) {
     input[list] = input[list].includes(id) ? input[list].filter((x) => x !== id) : [...input[list], id];
+  }
+
+  function setExtraModules(text: string) {
+    extraText = text;
+    input.extraModules = text.split(/[\s,]+/).filter(Boolean);
   }
 
   function chooseDbType(type: DbType) {
@@ -412,6 +420,15 @@
         <p class="text-xs text-slate-500">Recipes need Drupal 11 or Drupal CMS.</p>
       {/if}
       <label class="field">
+        <span>Extra modules to enable</span>
+        <input class="input" value={extraText} oninput={(e) => setExtraModules(e.currentTarget.value)} placeholder="media, admin_toolbar_search" />
+        <small class="text-slate-500">
+          Machine names of modules already in the codebase, such as core modules or ones from a bundle, separated by commas. They're
+          enabled after install; nothing is downloaded.
+        </small>
+        {#if errorFor("extraModules")}<small class="error">{errorFor("extraModules")}</small>{/if}
+      </label>
+      <label class="field">
         <span>CI pipeline</span>
         <select class="input" bind:value={input.ci}>
           {#each CI_OPTIONS as [value, label] (value)}<option {value}>{label}</option>{/each}
@@ -449,6 +466,9 @@
               ...compat.recipes.filter((r) => input.recipes.includes(r.id)).map((r) => `${r.label} recipe`),
             ].join(", ")}
           </dd>
+        {/if}
+        {#if input.extraModules.length}
+          <dt class="text-slate-500">Extra modules</dt><dd class="font-mono">{input.extraModules.join(", ")}</dd>
         {/if}
         {#if input.ci !== "none"}
           <dt class="text-slate-500">CI</dt><dd>{CI_OPTIONS.find(([v]) => v === input.ci)?.[1]}</dd>

@@ -46,6 +46,9 @@ pub struct ProjectInput {
     pub bundles: Vec<String>,
     #[serde(default)]
     pub recipes: Vec<String>,
+    /// Machine names of modules already in the codebase, enabled after install.
+    #[serde(default)]
+    pub extra_modules: Vec<String>,
     #[serde(default)]
     pub ci: Ci,
     pub admin_name: String,
@@ -70,6 +73,7 @@ pub struct Project {
     pub services: Vec<Service>,
     pub bundles: Vec<Bundle>,
     pub recipes: Vec<Recipe>,
+    pub extra_modules: Vec<String>,
     pub ci: Ci,
     pub admin_name: String,
     pub admin_email: String,
@@ -86,6 +90,14 @@ impl Project {
         normalize(&Path::new(DOCROOT).join(&self.config_sync_dir))
             .expect("validated in parse")
     }
+}
+
+/// A module machine name, as Drupal requires. Never starts with `-`, so it
+/// can't be read as a Drush option.
+fn is_module_name(s: &str) -> bool {
+    s.len() <= 64
+        && s.starts_with(|c: char| c.is_ascii_lowercase())
+        && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -222,6 +234,17 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
         }
     }
 
+    let mut extra_modules: Vec<String> = Vec::new();
+    for name in input.extra_modules.iter().map(|m| m.trim()) {
+        if !is_module_name(name) {
+            err("extraModules", &format!("\"{name}\" isn't a module machine name. Use names like media or admin_toolbar_search."));
+        } else if extra_modules.iter().any(|m| m == name) {
+            err("extraModules", &format!("{name} is listed more than once."));
+        } else {
+            extra_modules.push(name.to_string());
+        }
+    }
+
     if !is_admin_name(&input.admin_name) {
         err("adminName", ADMIN_NAME_RULE);
     }
@@ -262,6 +285,7 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
             services,
             bundles,
             recipes,
+            extra_modules,
             ci: input.ci,
             admin_name: input.admin_name.clone(),
             admin_email: input.admin_email.clone(),
@@ -291,6 +315,7 @@ pub(crate) mod tests {
             services: vec!["mailpit".into(), "adminer".into()],
             bundles: vec![],
             recipes: vec![],
+            extra_modules: vec![],
             ci: Ci::None,
             admin_name: "admin".into(),
             admin_email: "me@example.com".into(),
@@ -385,6 +410,21 @@ pub(crate) mod tests {
         i.bundles = vec!["nope".into()];
         i.recipes = vec![];
         assert_eq!(fields(parse(&i, &Compat::bundled())), vec!["bundles"]);
+    }
+
+    #[test]
+    fn extra_modules_are_module_machine_names() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut i = input(tmp.path());
+        i.extra_modules = vec!["media".into(), " admin_toolbar_search ".into()];
+        assert_eq!(parse(&i, &Compat::bundled()).unwrap().extra_modules, ["media", "admin_toolbar_search"]);
+
+        for bad in ["-media", "Media", "drupal/token", "token:^1", "2fa", "token; rm", "admin-toolbar"] {
+            i.extra_modules = vec![bad.into()];
+            assert_eq!(fields(parse(&i, &Compat::bundled())), ["extraModules"], "{bad}");
+        }
+        i.extra_modules = vec!["media".into(), "media".into()];
+        assert_eq!(fields(parse(&i, &Compat::bundled())), ["extraModules"], "duplicates");
     }
 
     #[test]

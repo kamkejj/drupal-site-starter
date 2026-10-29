@@ -34,6 +34,7 @@ recipes:require: {"kind":"ddev","args":["composer","require","drupal/drupal_cms_
 recipe:seo-tools: {"kind":"ddev","args":["drush","recipe","../recipes/drupal_cms_seo_tools","-y"],"stdin_secret":false}
 recipe:forms: {"kind":"ddev","args":["drush","recipe","../recipes/drupal_cms_forms","-y"],"stdin_secret":false}
 recipes:cache-rebuild: {"kind":"ddev","args":["drush","cache:rebuild"],"stdin_secret":false}
+extra:enable: {"kind":"ddev","args":["drush","pm:enable","-y","media","admin_toolbar_search"],"stdin_secret":false}
 write:.github/workflows/ci.yml: write .github/workflows/ci.yml
 config-export: {"kind":"ddev","args":["drush","config:export","-y"],"stdin_secret":false}
 htaccess: {"kind":"ddev","args":["drush","php:eval","\\Drupal::service('file.htaccess_writer')->ensure();"],"stdin_secret":false}

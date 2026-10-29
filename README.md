@@ -30,7 +30,8 @@ The app:
   `composer test` scripts.
 - Sets the config sync directory outside the webroot.
 - Adds optional module bundles, Drupal CMS recipes and a GitHub Actions or
-  GitLab CI pipeline.
+  GitLab CI pipeline, and enables any other modules you name that are
+  already in the codebase.
 - Starts every project as a Git repository with a Drupal `.gitignore`.
 - Checks your system before each run: DDEV version, container runtime
   (Docker Desktop, OrbStack, Colima, Rancher Desktop or Podman), mkcert, free

@@ -158,6 +158,9 @@ ddev drush recipe ../recipes/drupal_cms_forms -y
 # Rebuild caches
 ddev drush cache:rebuild
 
+# Enable the extra modules
+ddev drush pm:enable -y media admin_toolbar_search
+
 # Write the GitHub Actions workflow
 mkdir -p .github/workflows
 cat > .github/workflows/ci.yml <<'SITE_STARTER_EOF'

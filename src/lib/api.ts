@@ -83,6 +83,8 @@ export type ProjectInput = {
   services: string[];
   bundles: string[];
   recipes: string[];
+  /** Machine names of modules already in the codebase, enabled after install. */
+  extraModules: string[];
   ci: Ci;
   adminName: string;
   adminEmail: string;
@@ -145,6 +147,7 @@ export type Preset = Pick<
   | "services"
   | "bundles"
   | "recipes"
+  | "extraModules"
   | "ci"
   | "configSyncDir"
   | "exportConfigOnInstall"

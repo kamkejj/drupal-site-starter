@@ -13,17 +13,36 @@ test("creates a Drupal 11 site with a bundle, a recipe and GitHub CI", async ({ 
   await page.getByRole("button", { name: "4. Services" }).click();
   await page.getByRole("button", { name: /SEO basics/ }).click();
   await page.getByRole("button", { name: /^Forms/ }).click();
+  await page.getByLabel("Extra modules to enable").fill("media, admin_toolbar_search");
   await page.getByLabel("CI pipeline").selectOption("github");
   await page.getByRole("button", { name: "Next" }).click();
 
   await expect(page.getByText("SEO basics, Forms recipe")).toBeVisible();
+  await expect(page.getByText("media, admin_toolbar_search")).toBeVisible();
   await expect(page.getByText("GitHub Actions")).toBeVisible();
   await page.getByRole("button", { name: "Create site" }).click();
   await expect(page.getByText("acme-intranet is ready.")).toBeVisible();
 
   const [run] = await callsTo(page, "start_run");
   expect(run.job.kind).toBe("create");
-  expect(run.job.input).toMatchObject({ name: "acme-intranet", bundles: ["seo"], recipes: ["forms"], ci: "github" });
+  expect(run.job.input).toMatchObject({
+    name: "acme-intranet",
+    bundles: ["seo"],
+    recipes: ["forms"],
+    extraModules: ["media", "admin_toolbar_search"],
+    ci: "github",
+  });
+});
+
+test("an invalid extra module sends you back to the Services step", async ({ page }) => {
+  await open(page);
+  await page.getByPlaceholder("My new site").fill("Acme");
+  await page.getByRole("button", { name: "4. Services" }).click();
+  await page.getByLabel("Extra modules to enable").fill("media, drupal/webform");
+  await page.getByRole("button", { name: "Next" }).click();
+
+  await expect(page.getByText(`"drupal/webform" isn't a module machine name.`)).toBeVisible();
+  await expect(page.getByLabel("Extra modules to enable")).toHaveValue("media, drupal/webform");
 });
 
 test("Drupal 10 offers bundles but drops recipes", async ({ page }) => {
@@ -49,6 +68,7 @@ test("a preset names the services, bundles and recipes it can't use", async ({ p
     services: ["redis", "couchdb"],
     bundles: [],
     recipes: ["privacy-basic"],
+    extraModules: ["media"],
     ci: "none",
     configSyncDir: "../config/sync",
     exportConfigOnInstall: true,

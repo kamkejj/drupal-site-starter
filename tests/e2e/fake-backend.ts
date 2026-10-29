@@ -50,6 +50,7 @@ export async function fakeBackend(page: Page, options: Options = {}) {
           "mkdir", "ddev-config", "ddev-start", "create-project", "core-dev", "site-install",
           ...i.bundles.map((b: string) => `bundle:${b}:enable`),
           ...i.recipes.map((r: string) => `recipe:${r}`),
+          ...(i.extraModules.length ? ["extra:enable"] : []),
           ...(i.ci === "none" ? [] : [`ci:${i.ci}`]),
         ];
       }
@@ -63,6 +64,9 @@ export async function fakeBackend(page: Page, options: Options = {}) {
           if (i.database.kind === "dump" && !i.database.path)
             errors.push({ field: "database", message: "Choose a database dump: .sql, .sql.gz, .sql.bz2, .sql.xz, .zip or .tar.gz." });
           if (errors.length) throw errors;
+        } else {
+          const bad = i.extraModules.find((m: string) => !/^[a-z][a-z0-9_]*$/.test(m));
+          if (bad) throw [{ field: "extraModules", message: `"${bad}" isn't a module machine name. Use names like media or admin_toolbar_search.` }];
         }
         return {
           name: i.name,

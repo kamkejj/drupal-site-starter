@@ -369,6 +369,13 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
         steps.push(step("recipes:cache-rebuild", "Rebuild caches", ddev(&["drush", "cache:rebuild"]), 5 * MIN));
     }
 
+    // Only enables: the modules come from core, a bundle or a recipe's dependencies.
+    if !p.extra_modules.is_empty() {
+        let mut enable = vec!["drush", "pm:enable", "-y"];
+        enable.extend(p.extra_modules.iter().map(String::as_str));
+        steps.push(step("extra:enable", "Enable the extra modules", ddev(&enable), 5 * MIN));
+    }
+
     match p.ci {
         Ci::None => {}
         Ci::Github => steps.push(step(
@@ -483,6 +490,7 @@ mod tests {
         snapshot("drupal11-bundles-recipes-github", |i| {
             i.bundles = vec!["admin".into(), "dev".into()];
             i.recipes = vec!["seo-tools".into(), "forms".into()];
+            i.extra_modules = vec!["media".into(), "admin_toolbar_search".into()];
             i.ci = Ci::Github;
         });
     }

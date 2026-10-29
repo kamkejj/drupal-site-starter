@@ -400,6 +400,7 @@ mod smoke {
         i.services = list("SMOKE_SERVICES", "mailpit,adminer,redis");
         i.bundles = list("SMOKE_BUNDLES", "");
         i.recipes = list("SMOKE_RECIPES", "");
+        i.extra_modules = list("SMOKE_EXTRA_MODULES", "");
         if let Ok(ci) = std::env::var("SMOKE_CI") {
             i.ci = serde_json::from_value(serde_json::Value::String(ci)).expect("SMOKE_CI is none, github or gitlab");
         }
