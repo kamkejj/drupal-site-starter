@@ -145,8 +145,8 @@ The app also generates these files:
 
 - **Optional:** run `drush cex` right after install to create the first config
   export.
-- Import (`drush cim`) and Export (`drush cex`) buttons arrive with the
-  dashboard in v1.2.
+- Import (`drush cim`) and Export (`drush cex`) buttons live on the Sites
+  dashboard.
 
 ### 2.9 Git
 
@@ -389,6 +389,9 @@ type ProjectConfig = {
 ### v1.2
 
 - Dashboard of existing sites: start, stop, delete, snapshot, `cim`/`cex`
+  - Lists every project in `ddev list`, not only ones this app created.
+  - Delete is `ddev delete -y`: DDEV snapshots the database first, and the
+    project files stay, since the site may be the user's own work.
 - Remote update of `compat.json`
 - Auto-updater
 - Windows support via WSL2

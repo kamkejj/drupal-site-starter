@@ -50,17 +50,6 @@ fn ddev_info(path: &str) -> Option<DdevInfo> {
     })
 }
 
-pub fn existing_projects(path: &str) -> Vec<String> {
-    output(path, "ddev", &["list", "-j"])
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-        .and_then(|j| {
-            j["raw"].as_array().map(|ps| {
-                ps.iter().filter_map(|p| p["name"].as_str().map(str::to_string)).collect()
-            })
-        })
-        .unwrap_or_default()
-}
-
 /// DDEV moves to other ports when 80/443 are taken, so ask it for the real URL.
 pub fn project_url(path: &str, name: &str) -> Option<String> {
     let json: serde_json::Value = serde_json::from_str(&output(path, "ddev", &["describe", "-j", name])?).ok()?;

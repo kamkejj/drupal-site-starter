@@ -94,6 +94,16 @@ export type CheckResult = {
   detail: string;
 };
 
+export type Site = {
+  name: string;
+  status: string;
+  kind: string;
+  dir: string;
+  url: string | null;
+};
+
+export type SiteAction = "start" | "stop" | "snapshot" | "configImport" | "configExport" | "delete";
+
 export type StepStatus =
   | { status: "running" }
   | { status: "done" }
@@ -114,6 +124,8 @@ export const api = {
     invoke<void>("save_settings", { settings, password }),
   preflight: (projectsDir: string) => invoke<CheckResult[]>("preflight", { projectsDir }),
   existingProjects: () => invoke<string[]>("existing_projects"),
+  listSites: () => invoke<Site[]>("list_sites"),
+  siteAction: (name: string, action: SiteAction) => invoke<void>("site_action", { name, action }),
   projectUrl: (name: string) => invoke<string>("project_url", { name }),
   plan: (input: ProjectInput) => invoke<Plan>("plan_project", { input }),
   exportScript: (input: ProjectInput, path: string) =>

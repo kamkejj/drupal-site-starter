@@ -3,12 +3,14 @@
   import Preflight from "$lib/components/Preflight.svelte";
   import Run from "$lib/components/Run.svelte";
   import Settings from "$lib/components/Settings.svelte";
+  import Sites from "$lib/components/Sites.svelte";
   import Wizard from "$lib/components/Wizard.svelte";
 
   type Screen =
     | { kind: "preflight" }
     | { kind: "settings"; back: Screen }
     | { kind: "wizard" }
+    | { kind: "sites" }
     | { kind: "run"; input: ProjectInput; password: string | null };
 
   let screen = $state<Screen>({ kind: "preflight" });
@@ -31,9 +33,14 @@
     <h1 class="text-sm font-semibold">Drupal DDEV Site Creator</h1>
   </div>
   {#if screen.kind !== "run" && screen.kind !== "settings"}
-    <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "settings", back: screen })}>
-      Settings
-    </button>
+    <nav class="flex gap-4">
+      {#if screen.kind === "wizard"}
+        <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "sites" })}>Sites</button>
+      {/if}
+      <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "settings", back: screen })}>
+        Settings
+      </button>
+    </nav>
   {/if}
 </header>
 
@@ -58,6 +65,8 @@
             screen = back;
           }}
         />
+      {:else if screen.kind === "sites"}
+        <Sites onNew={() => (screen = { kind: "wizard" })} />
       {:else if screen.kind === "wizard"}
         {#key wizardKey}
           <Wizard {compat} {settings} {hasPassword} onCreate={(input, password) => (screen = { kind: "run", input, password })} />

@@ -6,6 +6,7 @@ mod presets;
 mod runner;
 mod script;
 mod settings;
+mod sites;
 mod steps;
 
 use compat::Compat;
@@ -132,7 +133,7 @@ async fn preflight(state: State<'_, AppState>, projects_dir: String) -> Result<V
 #[tauri::command]
 async fn existing_projects(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     let path = state.exec.path.clone();
-    tauri::async_runtime::spawn_blocking(move || preflight::existing_projects(&path))
+    tauri::async_runtime::spawn_blocking(move || sites::list(&path).into_iter().map(|s| s.name).collect())
         .await
         .map_err(|e| e.to_string())
 }
@@ -144,6 +145,19 @@ async fn project_url(state: State<'_, AppState>, name: String) -> Result<String,
     tauri::async_runtime::spawn_blocking(move || preflight::project_url(&path, &name).unwrap_or(fallback))
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_sites(state: State<'_, AppState>) -> Result<Vec<sites::Site>, String> {
+    let path = state.exec.path.clone();
+    tauri::async_runtime::spawn_blocking(move || sites::list(&path))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn site_action(state: State<'_, AppState>, name: String, action: sites::SiteAction) -> Result<(), String> {
+    sites::run(&state.exec.path, &name, action).await
 }
 
 #[derive(Serialize)]
@@ -319,6 +333,8 @@ pub fn run() {
             save_settings,
             preflight,
             existing_projects,
+            list_sites,
+            site_action,
             project_url,
             plan_project,
             export_script,
