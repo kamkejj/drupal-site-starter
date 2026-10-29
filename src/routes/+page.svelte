@@ -47,7 +47,7 @@
 <header class="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
   <div class="flex items-center gap-2">
     <span class="grid size-7 place-items-center rounded-md bg-drop text-sm font-bold text-white">D</span>
-    <h1 class="text-sm font-semibold">Drupal DDEV Site Creator</h1>
+    <h1 class="text-sm font-semibold">Drupal Site Starter</h1>
   </div>
   {#if screen.kind !== "run" && screen.kind !== "settings"}
     <nav class="flex gap-4">

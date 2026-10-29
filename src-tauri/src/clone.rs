@@ -305,7 +305,7 @@ mod smoke {
         let input = CloneInput {
             repo_url: std::env::var("SMOKE_REPO").expect("SMOKE_REPO"),
             parent_dir: parent.display().to_string(),
-            name: std::env::var("SMOKE_NAME").unwrap_or_else(|_| "ddevcreator-smoke-clone".into()),
+            name: std::env::var("SMOKE_NAME").unwrap_or_else(|_| "sitestarter-smoke-clone".into()),
             drupal: "11".into(),
             database: DbSource::ExistingConfig,
             admin_name: "admin".into(),

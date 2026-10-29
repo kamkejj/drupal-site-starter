@@ -319,7 +319,7 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
                         Action::AppendFile {
                             path: SETTINGS_PHP.into(),
                             text: format!(
-                                "\n// {label} settings, written by Drupal DDEV Site Creator.\n\
+                                "\n// {label} settings, written by Drupal Site Starter.\n\
                                  if (getenv('IS_DDEV_PROJECT') == 'true' && file_exists(__DIR__ . '/{file}')) {{\n  \
                                  include __DIR__ . '/{file}';\n}}\n",
                                 label = s.label,

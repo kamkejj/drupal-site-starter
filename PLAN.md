@@ -1,4 +1,4 @@
-# Drupal DDEV Site Creator — Project Plan
+# Drupal Site Starter — Project Plan
 
 A cross-platform desktop GUI app that creates new Drupal local dev sites with
 DDEV, based on a set of user-selected options.
@@ -360,7 +360,7 @@ Rust backend
 ### Suggested Project Structure
 
 ```text
-drupal-ddev-creator/
+drupal-site-starter/
 ├─ src/                      # Svelte frontend
 │  ├─ lib/
 │  │  ├─ schema/             # Zod schemas (ProjectConfig, Settings, Preset)
@@ -466,10 +466,10 @@ works only for `localhost` and `127.0.0.1`, for testing).
   and uses it on later launches.
 - **App updates:** `latest.json` in the Tauri updater format, next to the
   signed bundles. The public key is in `tauri.conf.json`; the private key is
-  `~/.tauri/drupal-ddev-creator.key`. Release builds need it:
+  `~/.tauri/drupal-site-starter.key`. Release builds need it:
 
   ```bash
-  TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/drupal-ddev-creator.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" pnpm tauri build
+  TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/drupal-site-starter.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" pnpm tauri build
   ```
 
   Keep the private key out of the repository and back it up. Without it,

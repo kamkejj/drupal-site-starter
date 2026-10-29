@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    drupal_ddev_creator_lib::run()
+    drupal_site_starter_lib::run()
 }

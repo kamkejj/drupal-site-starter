@@ -1,6 +1,6 @@
 use std::process::Command;
 
-const MARKER: &str = "__DDEV_CREATOR_PATH__";
+const MARKER: &str = "__SITE_STARTER_PATH__";
 
 /// Apps launched from Finder or the Dock inherit a bare PATH, so read the
 /// one the user's login shell builds. Falls back to common install dirs.

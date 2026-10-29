@@ -383,7 +383,7 @@ mod smoke {
         let parent = PathBuf::from(std::env::var("SMOKE_PARENT").expect("SMOKE_PARENT"));
         let mut i = input(&parent);
         i.drupal = std::env::var("SMOKE_DRUPAL").unwrap_or_else(|_| "11".into());
-        i.name = std::env::var("SMOKE_NAME").unwrap_or_else(|_| format!("ddevcreator-smoke-{}", i.drupal));
+        i.name = std::env::var("SMOKE_NAME").unwrap_or_else(|_| format!("sitestarter-smoke-{}", i.drupal));
         let compat = Compat::bundled();
         let release = compat.release(&i.drupal).expect("SMOKE_DRUPAL names a release");
         i.php = release.default_php.clone();

@@ -144,7 +144,7 @@
   <div class="field">
     <label for="update-url">Update URL</label>
     <div class="flex gap-2">
-      <input id="update-url" class="input flex-1 font-mono" bind:value={draft.updateUrl} placeholder="https://example.com/drupal-ddev-creator" />
+      <input id="update-url" class="input flex-1 font-mono" bind:value={draft.updateUrl} placeholder="https://example.com/drupal-site-starter" />
       <button class="btn-ghost" disabled={!draft.updateUrl.trim() || checking} onclick={checkUpdates}>
         {checking ? "Checking…" : "Check now"}
       </button>
