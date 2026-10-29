@@ -468,8 +468,10 @@ works only for `localhost` and `127.0.0.1`, for testing).
   `~/.tauri/drupal-site-starter.key`. Release builds need it:
 
   ```bash
-  TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/drupal-site-starter.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" pnpm tauri build
+  TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/drupal-site-starter.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="<key password>" pnpm tauri build
   ```
 
-  Keep the private key out of the repository and back it up. Without it,
+  The key is password-protected; keep the password with the key in your
+  password manager. Keep the private key out of the repository and back it
+  up. Without it,
   installed copies can't verify any later update.
