@@ -473,5 +473,4 @@ works only for `localhost` and `127.0.0.1`, for testing).
 
   The key is password-protected; keep the password with the key in your
   password manager. Keep the private key out of the repository and back it
-  up. Without it,
-  installed copies can't verify any later update.
+  up. Without it, installed copies can't verify any later update.
