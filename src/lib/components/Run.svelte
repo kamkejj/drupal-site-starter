@@ -2,24 +2,24 @@
   import { untrack } from "svelte";
   import { ask } from "@tauri-apps/plugin-dialog";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { api, type Job, type Plan, type RunEvent, type StepStatus } from "$lib/api";
+  import { api, type Job, type Phase, type Plan, type RunEvent, type StepStatus } from "$lib/api";
 
   let {
     job,
     password,
     onBack,
-  }: { job: Job; password: string | null; onBack: () => void } = $props();
+    phase = $bindable(),
+  }: { job: Job; password: string | null; onBack: () => void; phase?: Phase } = $props();
 
   const name = $derived(job.input.name);
   const verb = $derived(job.kind === "clone" ? "Cloning" : "Creating");
 
-  type Phase = "running" | "failed" | "cancelled" | "done";
   const MAX_LINES = 4000;
 
   let plan = $state<Plan | null>(null);
   let statuses = $state<Record<string, StepStatus>>({});
   let lines = $state<{ id: string; line: string }[]>([]);
-  let phase = $state<Phase>("running");
+  phase = "running";
   let logPath = $state("");
   let error = $state("");
   let logEl: HTMLPreElement | undefined = $state();

@@ -185,6 +185,8 @@ export type RunEvent =
   | { type: "log"; id: string; line: string }
   | { type: "finished"; ok: boolean; cancelled: boolean };
 
+export type Phase = "running" | "failed" | "cancelled" | "done";
+
 export const api = {
   compat: () => invoke<Compat>("get_compat"),
   machineName: (display: string) => invoke<string>("machine_name", { display }),

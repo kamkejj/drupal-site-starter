@@ -32,6 +32,9 @@ test("creates a Drupal 11 site with a bundle, a recipe and GitHub CI", async ({ 
     extraModules: ["media", "admin_toolbar_search"],
     ci: "github",
   });
+
+  await page.getByRole("navigation").getByRole("button", { name: "Sites" }).click();
+  await expect(page.getByText("acme-intranet is ready.")).toBeHidden();
 });
 
 test("an invalid extra module sends you back to the Services step", async ({ page }) => {
