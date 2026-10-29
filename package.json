@@ -11,6 +11,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
+    "sign:compat": "mkdir -p dist/compat && cp src-tauri/resources/compat.json dist/compat/ && tauri signer sign dist/compat/compat.json",
     "test:e2e": "playwright test"
   },
   "license": "MIT",
