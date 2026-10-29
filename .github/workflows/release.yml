@@ -1,5 +1,6 @@
 # Builds the installers for macOS, Windows and Linux and attaches them to a
-# draft GitHub release, along with latest.json for the Tauri updater. Runs
+# draft GitHub release, along with latest.json for the Tauri updater and a
+# signed compat.json, so the release's download URL serves both. Runs
 # when a version tag is pushed (bump the version in tauri.conf.json,
 # Cargo.toml and package.json first), or on demand.
 #
@@ -7,7 +8,7 @@
 # needs the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 # secrets (the key is ~/.tauri/drupal-site-starter.key, see PLAN.md 8.1).
 #
-# This job holds the signing key, so every action is pinned to a commit
+# These jobs hold the signing key, so every action is pinned to a commit
 # rather than a tag that could be moved. To update one, look up the new
 # tag's commit and change both the hash and the version comment.
 name: Release
@@ -69,3 +70,28 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  # Signs the bundled compat.json with the updater key and attaches it with
+  # its .sig, so apps pointed at releases/latest/download find a data file
+  # that matches this release. compat.yml republishes it between releases.
+  compat:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm sign:compat
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Attach compat.json to the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(jq -r .version src-tauri/tauri.conf.json)"
+          gh release upload "$tag" dist/compat/compat.json dist/compat/compat.json.sig --clobber

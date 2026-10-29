@@ -62,6 +62,17 @@ fn compat_cache_file(app: &AppHandle) -> Result<PathBuf, String> {
     data_file(app, &["compat.json"])
 }
 
+/// The updater's public key in `tauri.conf.json`, which also signs compat.json.
+fn update_pubkey(app: &AppHandle) -> Result<String, String> {
+    app.config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|u| u["pubkey"].as_str())
+        .map(str::to_string)
+        .ok_or_else(|| "tauri.conf.json has no updater pubkey.".to_string())
+}
+
 fn run_state_file(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
     data_file(app, &["runs", &format!("{name}.json")])
 }
@@ -122,7 +133,8 @@ fn suggested_clone_name(url: String) -> String {
 async fn check_compat_update(app: AppHandle, state: State<'_, AppState>) -> Result<updates::CompatUpdate, String> {
     let url = updates::endpoint(&AppSettings::load(&settings_file(&app)?).update_url, "compat.json")?;
     let text = updates::download(&url).await?;
-    let (next, update) = updates::accept_compat(&state.compat(), &text, &compat_cache_file(&app)?)?;
+    let signature = updates::download(&format!("{url}.sig")).await?;
+    let (next, update) = updates::accept_compat(&state.compat(), &text, &signature, &compat_cache_file(&app)?, &update_pubkey(&app)?)?;
     *state.compat.write().expect("lock") = next;
     Ok(update)
 }
@@ -440,7 +452,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let compat = updates::load_compat(&compat_cache_file(app.handle())?);
+            let compat = updates::load_compat(&compat_cache_file(app.handle())?, &update_pubkey(app.handle())?);
             app.manage(AppState {
                 compat: RwLock::new(compat),
                 exec: NativeExecutor { path: env::login_shell_path() },

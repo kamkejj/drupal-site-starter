@@ -470,11 +470,27 @@ type ProjectConfig = {
 Both updates are files under the Update URL. It must use HTTPS (plain HTTP
 works only for `localhost` and `127.0.0.1`, for testing).
 
-- **`compat.json`:** bump `revision` with every change and upload the file.
-  The app takes it only when its revision is higher than the copy it has,
-  and only if it passes the same checks as the bundled file (package, module
-  and add-on names can't be read as command options). It saves the download
-  and uses it on later launches.
+Releases attach both, so the usual Update URL is
+`https://github.com/kamkejj/drupal-site-starter/releases/latest/download`.
+
+- **`compat.json`:** signed with the updater key below, because its add-on
+  names, packages and setup commands run on the user's machine. The app
+  downloads `compat.json` and `compat.json.sig` and takes the file only if
+  the signature matches the public key in `tauri.conf.json`, its revision
+  is higher than the copy it has, and it passes the same checks as the
+  bundled file (package, module and add-on names can't be read as command
+  options). It saves the download with its signature and checks both again
+  on later launches, falling back to the bundled copy if either fails.
+  - **With each release,** `release.yml` signs the bundled file and attaches
+    it to the release.
+  - **Between releases,** bump `revision` in
+    `src-tauri/resources/compat.json`, merge to `main`, and run the
+    **Publish compat.json** workflow (`compat.yml`). It replaces the file on
+    the latest release, and refuses a revision that isn't higher than the
+    published one.
+  - **By hand,** for another server: `pnpm sign:compat` with the key
+    variables below writes `dist/compat/compat.json` and its `.sig`; upload
+    both.
 - **App updates:** `latest.json` in the Tauri updater format, next to the
   signed bundles. The public key is in `tauri.conf.json`; the private key is
   `~/.tauri/drupal-site-starter.key`. Release builds need it:
