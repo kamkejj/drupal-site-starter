@@ -25,7 +25,6 @@ jobs:
             recipes: ""
             clone: false
     env:
-      SMOKE_PARENT: ${{ runner.temp }}/smoke
       SMOKE_DRUPAL: ${{ matrix.drupal }}
       SMOKE_NAME: smoke-${{ matrix.drupal }}
       SMOKE_BUNDLES: ${{ matrix.bundles }}
@@ -44,7 +43,11 @@ jobs:
       - uses: ddev/github-action-setup-ddev@v1
         with:
           autostart: false
-      - run: mkdir -p "$SMOKE_PARENT"
+      # The runner context isn't available in job-level env, so set it here.
+      - name: Make the parent folder
+        run: |
+          echo "SMOKE_PARENT=$RUNNER_TEMP/smoke" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/smoke"
       - name: Create the site
         run: cargo test --manifest-path src-tauri/Cargo.toml smoke_creates -- --ignored --nocapture
       - name: Clone it and install from its config
