@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, type AppSettings, type AppUpdate, type Compat, type Job } from "$lib/api";
+  import { api, type AppSettings, type AppUpdate, type Compat, type Job, type Phase } from "$lib/api";
   import Clone from "$lib/components/Clone.svelte";
   import Preflight from "$lib/components/Preflight.svelte";
   import Run from "$lib/components/Run.svelte";
@@ -17,6 +17,17 @@
 
   let screen = $state<Screen>({ kind: "preflight" });
   let wizardKey = $state(0);
+  let runPhase = $state<Phase>("running");
+
+  function startRun(job: Job, password: string | null) {
+    runPhase = "running";
+    screen = { kind: "run", job, password };
+  }
+
+  /** Mounting Run starts its job, so Settings must not return to a run screen. */
+  function openSettings() {
+    screen = { kind: "settings", back: screen.kind === "run" ? { kind: "wizard" } : screen };
+  }
 
   const boot = Promise.all([api.compat(), api.loadSettings()]);
   let settings = $state<AppSettings | null>(null);
@@ -49,10 +60,10 @@
     <span class="grid size-7 place-items-center rounded-md bg-drop text-sm font-bold text-white">D</span>
     <h1 class="text-sm font-semibold">Drupal Site Starter</h1>
   </div>
-  {#if screen.kind !== "run" && screen.kind !== "settings"}
+  {#if screen.kind !== "settings" && !(screen.kind === "run" && runPhase === "running")}
     <nav class="flex gap-4">
       {#if appUpdate}
-        <button class="text-sm font-medium text-drop" onclick={() => (screen = { kind: "settings", back: screen })}>
+        <button class="text-sm font-medium text-drop" onclick={openSettings}>
           Update to {appUpdate.version}
         </button>
       {/if}
@@ -65,7 +76,7 @@
       {#if screen.kind !== "clone"}
         <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "clone" })}>Clone from Git</button>
       {/if}
-      <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "settings", back: screen })}>
+      <button class="text-sm text-slate-500 hover:text-drop" onclick={openSettings}>
         Settings
       </button>
     </nav>
@@ -101,7 +112,7 @@
           {compat}
           {settings}
           {hasPassword}
-          onStart={(job, password) => (screen = { kind: "run", job, password })}
+          onStart={startRun}
           onCancel={() => (screen = { kind: "wizard" })}
         />
       {:else if screen.kind === "wizard"}
@@ -110,13 +121,14 @@
             {compat}
             {settings}
             {hasPassword}
-            onCreate={(input, password) => (screen = { kind: "run", job: { kind: "create", input }, password })}
+            onCreate={(input, password) => startRun({ kind: "create", input }, password)}
           />
         {/key}
       {:else}
         <Run
           job={screen.job}
           password={screen.password}
+          bind:phase={runPhase}
           onBack={() => {
             wizardKey++;
             screen = { kind: "wizard" };
