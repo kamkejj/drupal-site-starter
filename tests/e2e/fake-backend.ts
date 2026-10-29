@@ -8,6 +8,7 @@ export type Options = {
   /** Revision `check_compat_update` reports; higher than bundled means updated. */
   remoteRevision?: number;
   appUpdate?: { version: string; currentVersion: string; notes: string | null } | null;
+  presets?: Record<string, unknown>[];
 };
 
 /**
@@ -83,7 +84,7 @@ export async function fakeBackend(page: Page, options: Options = {}) {
         save_settings: ({ settings: s }) => Object.assign(settings, s),
         preflight: () => [{ id: "ddev", label: "DDEV", level: "ok", detail: "v1.25.5" }],
         existing_projects: () => ["taken-site"],
-        list_presets: () => [],
+        list_presets: () => options.presets ?? [],
         list_sites: () => [],
         machine_name: ({ display }) => machineName(display),
         suggested_clone_name: ({ url }) =>
