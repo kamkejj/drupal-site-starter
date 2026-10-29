@@ -173,7 +173,7 @@
     <div class="flex flex-wrap gap-2">
       {#each compat.services as s (s.id)}
         <button
-          class="choice-tile min-h-11 rounded-full px-3 py-1 text-sm {draft.services.includes(s.id) ? 'is-selected' : ''}"
+          class="btn choice-tile rounded-full {draft.services.includes(s.id) ? 'is-selected' : ''}"
           aria-pressed={draft.services.includes(s.id)}
           onclick={() => toggle(s.id)}>{s.label}</button
         >
