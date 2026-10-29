@@ -113,7 +113,7 @@ mod tests {
             services: vec!["redis".into(), "solr".into()],
             bundles: vec!["seo".into()],
             recipes: vec![],
-            extra_modules: vec!["token".into()],
+            extra_modules: vec!["media".into()],
             ci: Ci::Gitlab,
             config_sync_dir: "../config/sync".into(),
             export_config_on_install: true,

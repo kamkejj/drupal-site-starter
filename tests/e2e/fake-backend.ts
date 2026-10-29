@@ -65,8 +65,8 @@ export async function fakeBackend(page: Page, options: Options = {}) {
             errors.push({ field: "database", message: "Choose a database dump: .sql, .sql.gz, .sql.bz2, .sql.xz, .zip or .tar.gz." });
           if (errors.length) throw errors;
         } else {
-          const bad = i.extraModules.find((m: string) => !/^[a-z][a-z0-9_]*(:.+)?$/.test(m));
-          if (bad) throw [{ field: "extraModules", message: `"${bad}" isn't a module name. Use names like token or webform:^6.2.` }];
+          const bad = i.extraModules.find((m: string) => !/^[a-z][a-z0-9_]*$/.test(m));
+          if (bad) throw [{ field: "extraModules", message: `"${bad}" isn't a module machine name. Use names like media or admin_toolbar_search.` }];
         }
         return {
           name: i.name,

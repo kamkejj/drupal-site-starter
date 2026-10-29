@@ -146,12 +146,6 @@ ddev composer require --dev drupal/devel drupal/stage_file_proxy -n
 # Enable the Developer tools modules
 ddev drush pm:enable -y devel stage_file_proxy
 
-# Add the extra modules
-ddev composer require drupal/token 'drupal/webform:^6.2 || ^7' -n
-
-# Enable the extra modules
-ddev drush pm:enable -y token webform
-
 # Download the recipes
 ddev composer require drupal/drupal_cms_seo_tools drupal/drupal_cms_forms -n
 
@@ -163,6 +157,9 @@ ddev drush recipe ../recipes/drupal_cms_forms -y
 
 # Rebuild caches
 ddev drush cache:rebuild
+
+# Enable the extra modules
+ddev drush pm:enable -y media admin_toolbar_search
 
 # Write the GitHub Actions workflow
 mkdir -p .github/workflows

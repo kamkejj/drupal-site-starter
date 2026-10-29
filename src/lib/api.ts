@@ -83,7 +83,7 @@ export type ProjectInput = {
   services: string[];
   bundles: string[];
   recipes: string[];
-  /** Drupal.org project names, each optionally followed by `:constraint`. */
+  /** Machine names of modules already in the codebase, enabled after install. */
   extraModules: string[];
   ci: Ci;
   adminName: string;

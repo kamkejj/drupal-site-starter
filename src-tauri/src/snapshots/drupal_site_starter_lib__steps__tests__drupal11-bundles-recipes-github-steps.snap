@@ -30,12 +30,11 @@ bundle:admin:require: {"kind":"ddev","args":["composer","require","drupal/admin_
 bundle:admin:enable: {"kind":"ddev","args":["drush","pm:enable","-y","admin_toolbar","admin_toolbar_tools"],"stdin_secret":false}
 bundle:dev:require: {"kind":"ddev","args":["composer","require","--dev","drupal/devel","drupal/stage_file_proxy","-n"],"stdin_secret":false}
 bundle:dev:enable: {"kind":"ddev","args":["drush","pm:enable","-y","devel","stage_file_proxy"],"stdin_secret":false}
-extra:require: {"kind":"ddev","args":["composer","require","drupal/token","drupal/webform:^6.2 || ^7","-n"],"stdin_secret":false}
-extra:enable: {"kind":"ddev","args":["drush","pm:enable","-y","token","webform"],"stdin_secret":false}
 recipes:require: {"kind":"ddev","args":["composer","require","drupal/drupal_cms_seo_tools","drupal/drupal_cms_forms","-n"],"stdin_secret":false}
 recipe:seo-tools: {"kind":"ddev","args":["drush","recipe","../recipes/drupal_cms_seo_tools","-y"],"stdin_secret":false}
 recipe:forms: {"kind":"ddev","args":["drush","recipe","../recipes/drupal_cms_forms","-y"],"stdin_secret":false}
 recipes:cache-rebuild: {"kind":"ddev","args":["drush","cache:rebuild"],"stdin_secret":false}
+extra:enable: {"kind":"ddev","args":["drush","pm:enable","-y","media","admin_toolbar_search"],"stdin_secret":false}
 write:.github/workflows/ci.yml: write .github/workflows/ci.yml
 config-export: {"kind":"ddev","args":["drush","config:export","-y"],"stdin_secret":false}
 htaccess: {"kind":"ddev","args":["drush","php:eval","\\Drupal::service('file.htaccess_writer')->ensure();"],"stdin_secret":false}

@@ -352,18 +352,6 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
         }
     }
 
-    if !p.extra_modules.is_empty() {
-        let packages: Vec<String> = p.extra_modules.iter().map(|m| m.package()).collect();
-        let mut require = vec!["composer", "require"];
-        require.extend(packages.iter().map(String::as_str));
-        require.push("-n");
-        steps.push(step("extra:require", "Add the extra modules", ddev(&require), 10 * MIN));
-
-        let mut enable = vec!["drush", "pm:enable", "-y"];
-        enable.extend(p.extra_modules.iter().map(|m| m.name.as_str()));
-        steps.push(step("extra:enable", "Enable the extra modules", ddev(&enable), 5 * MIN));
-    }
-
     if !p.recipes.is_empty() {
         let mut require = vec!["composer", "require"];
         require.extend(p.recipes.iter().map(|r| r.package.as_str()));
@@ -379,6 +367,13 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
             ));
         }
         steps.push(step("recipes:cache-rebuild", "Rebuild caches", ddev(&["drush", "cache:rebuild"]), 5 * MIN));
+    }
+
+    // Only enables: the modules come from core, a bundle or a recipe's dependencies.
+    if !p.extra_modules.is_empty() {
+        let mut enable = vec!["drush", "pm:enable", "-y"];
+        enable.extend(p.extra_modules.iter().map(String::as_str));
+        steps.push(step("extra:enable", "Enable the extra modules", ddev(&enable), 5 * MIN));
     }
 
     match p.ci {
@@ -495,7 +490,7 @@ mod tests {
         snapshot("drupal11-bundles-recipes-github", |i| {
             i.bundles = vec!["admin".into(), "dev".into()];
             i.recipes = vec!["seo-tools".into(), "forms".into()];
-            i.extra_modules = vec!["token".into(), "webform:^6.2 || ^7".into()];
+            i.extra_modules = vec!["media".into(), "admin_toolbar_search".into()];
             i.ci = Ci::Github;
         });
     }

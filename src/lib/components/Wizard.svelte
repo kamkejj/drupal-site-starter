@@ -170,10 +170,9 @@
     input[list] = input[list].includes(id) ? input[list].filter((x) => x !== id) : [...input[list], id];
   }
 
-  /** One entry per comma or line, so a constraint like `^6 || ^7` stays whole. */
   function setExtraModules(text: string) {
     extraText = text;
-    input.extraModules = text.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+    input.extraModules = text.split(/[\s,]+/).filter(Boolean);
   }
 
   function chooseDbType(type: DbType) {
@@ -421,10 +420,11 @@
         <p class="text-xs text-slate-500">Recipes need Drupal 11 or Drupal CMS.</p>
       {/if}
       <label class="field">
-        <span>Extra modules</span>
-        <input class="input" value={extraText} oninput={(e) => setExtraModules(e.currentTarget.value)} placeholder="token, webform:^6.2" />
+        <span>Extra modules to enable</span>
+        <input class="input" value={extraText} oninput={(e) => setExtraModules(e.currentTarget.value)} placeholder="media, admin_toolbar_search" />
         <small class="text-slate-500">
-          Drupal.org project names, separated by commas. Each is added with Composer and enabled. Add <code>:constraint</code> to pick a version.
+          Machine names of modules already in the codebase, such as core modules or ones from a bundle, separated by commas. They're
+          enabled after install; nothing is downloaded.
         </small>
         {#if errorFor("extraModules")}<small class="error">{errorFor("extraModules")}</small>{/if}
       </label>
