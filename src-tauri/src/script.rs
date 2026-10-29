@@ -24,6 +24,9 @@ fn render_action(action: &Action, p: &Project) -> String {
             format!("printf '%s\\n' \"${PASSWORD_ENV}\" | {}", command("ddev", args))
         }
         Action::Git { args } => command("git", args),
+        Action::GitClone { url } => {
+            format!("git clone -- {} {name}\ncd {name}", quote(url), name = quote(&p.name))
+        }
         Action::Mkdir { path } => format!("mkdir -p {}", quote(path)),
         Action::WriteFile { path, contents } if contents.is_empty() => {
             format!("mkdir -p {} && touch {}", quote(&parent(path)), quote(path))

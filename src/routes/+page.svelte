@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { api, type AppSettings, type Compat, type ProjectInput } from "$lib/api";
+  import { api, type AppSettings, type AppUpdate, type Compat, type Job } from "$lib/api";
+  import Clone from "$lib/components/Clone.svelte";
   import Preflight from "$lib/components/Preflight.svelte";
   import Run from "$lib/components/Run.svelte";
   import Settings from "$lib/components/Settings.svelte";
@@ -11,7 +12,8 @@
     | { kind: "settings"; back: Screen }
     | { kind: "wizard" }
     | { kind: "sites" }
-    | { kind: "run"; input: ProjectInput; password: string | null };
+    | { kind: "clone" }
+    | { kind: "run"; job: Job; password: string | null };
 
   let screen = $state<Screen>({ kind: "preflight" });
   let wizardKey = $state(0);
@@ -24,7 +26,22 @@
     compat = c;
     settings = s.settings;
     hasPassword = s.hasPassword;
+    if (s.settings.updateUrl.trim()) checkForUpdates();
   });
+
+  let appUpdate = $state<AppUpdate | null>(null);
+
+  async function reloadCompat() {
+    compat = await api.compat();
+    wizardKey++;
+  }
+
+  /** Quiet check on launch. Errors stay quiet too; Settings shows them. */
+  async function checkForUpdates() {
+    const [c, a] = await Promise.allSettled([api.checkCompatUpdate(), api.checkAppUpdate()]);
+    if (c.status === "fulfilled" && c.value.updated) await reloadCompat();
+    if (a.status === "fulfilled") appUpdate = a.value;
+  }
 </script>
 
 <header class="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
@@ -34,8 +51,19 @@
   </div>
   {#if screen.kind !== "run" && screen.kind !== "settings"}
     <nav class="flex gap-4">
-      {#if screen.kind === "wizard"}
+      {#if appUpdate}
+        <button class="text-sm font-medium text-drop" onclick={() => (screen = { kind: "settings", back: screen })}>
+          Update to {appUpdate.version}
+        </button>
+      {/if}
+      {#if screen.kind !== "wizard" && screen.kind !== "preflight"}
+        <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "wizard" })}>New site</button>
+      {/if}
+      {#if screen.kind !== "sites"}
         <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "sites" })}>Sites</button>
+      {/if}
+      {#if screen.kind !== "clone"}
+        <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "clone" })}>Clone from Git</button>
       {/if}
       <button class="text-sm text-slate-500 hover:text-drop" onclick={() => (screen = { kind: "settings", back: screen })}>
         Settings
@@ -58,6 +86,7 @@
           {settings}
           {hasPassword}
           onCancel={() => (screen = back)}
+          onCompatUpdated={reloadCompat}
           onSaved={(s, p) => {
             settings = s;
             hasPassword = p;
@@ -67,13 +96,26 @@
         />
       {:else if screen.kind === "sites"}
         <Sites onNew={() => (screen = { kind: "wizard" })} />
+      {:else if screen.kind === "clone"}
+        <Clone
+          {compat}
+          {settings}
+          {hasPassword}
+          onStart={(job, password) => (screen = { kind: "run", job, password })}
+          onCancel={() => (screen = { kind: "wizard" })}
+        />
       {:else if screen.kind === "wizard"}
         {#key wizardKey}
-          <Wizard {compat} {settings} {hasPassword} onCreate={(input, password) => (screen = { kind: "run", input, password })} />
+          <Wizard
+            {compat}
+            {settings}
+            {hasPassword}
+            onCreate={(input, password) => (screen = { kind: "run", job: { kind: "create", input }, password })}
+          />
         {/key}
       {:else}
         <Run
-          input={screen.input}
+          job={screen.job}
           password={screen.password}
           onBack={() => {
             wizardKey++;

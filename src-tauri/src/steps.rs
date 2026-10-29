@@ -2,7 +2,7 @@
 //! from `build`, so the two cannot drift apart.
 
 use crate::compat::{Compat, DbType, Wiring};
-use crate::config::{Project, DOCROOT};
+use crate::config::{Ci, Project, DOCROOT};
 use serde::Serialize;
 
 pub const SETTINGS_PHP: &str = "web/sites/default/settings.php";
@@ -21,6 +21,8 @@ pub enum Action {
     /// `ddev exec` forwards stdin; `ddev exec --raw` does not.
     Ddev { args: Vec<String>, stdin_secret: bool },
     Git { args: Vec<String> },
+    /// `git clone -- <url> <project folder>`, run from the parent folder.
+    GitClone { url: String },
     CreateProjectDir,
     Mkdir { path: String },
     WriteFile { path: String, contents: String },
@@ -331,6 +333,62 @@ pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
         }
     }
 
+    for b in &p.bundles {
+        let mut require = vec!["composer", "require"];
+        if b.dev {
+            require.push("--dev");
+        }
+        require.extend(b.packages.iter().map(String::as_str));
+        require.push("-n");
+        steps.push(step(format!("bundle:{}:require", b.id), format!("Add the {} modules", b.label), ddev(&require), 10 * MIN));
+
+        let mut enable = vec!["drush", "pm:enable", "-y"];
+        enable.extend(b.modules.iter().map(String::as_str));
+        steps.push(step(format!("bundle:{}:enable", b.id), format!("Enable the {} modules", b.label), ddev(&enable), 5 * MIN));
+
+        for (n, cmd) in b.setup.iter().enumerate() {
+            let mut args = vec!["drush"];
+            args.extend(cmd.drush.iter().map(String::as_str));
+            steps.push(step(format!("bundle:{}:setup:{n}", b.id), cmd.title.clone(), ddev(&args), 5 * MIN));
+        }
+    }
+
+    if !p.recipes.is_empty() {
+        let mut require = vec!["composer", "require"];
+        require.extend(p.recipes.iter().map(|r| r.package.as_str()));
+        require.push("-n");
+        steps.push(step("recipes:require", "Download the recipes", ddev(&require), 15 * MIN));
+        // Drush runs from the docroot, and Composer puts recipes beside it.
+        for r in &p.recipes {
+            steps.push(step(
+                format!("recipe:{}", r.id),
+                format!("Apply the {} recipe", r.label),
+                ddev(&["drush", "recipe", &format!("../recipes/{}", r.dir_name()), "-y"]),
+                10 * MIN,
+            ));
+        }
+        steps.push(step("recipes:cache-rebuild", "Rebuild caches", ddev(&["drush", "cache:rebuild"]), 5 * MIN));
+    }
+
+    match p.ci {
+        Ci::None => {}
+        Ci::Github => steps.push(step(
+            "write:.github/workflows/ci.yml",
+            "Write the GitHub Actions workflow",
+            Action::WriteFile { path: ".github/workflows/ci.yml".into(), contents: include_str!("../resources/templates/github-ci.yml").into() },
+            MIN,
+        )),
+        Ci::Gitlab => steps.push(step(
+            "write:.gitlab-ci.yml",
+            "Write the GitLab CI pipeline",
+            Action::WriteFile {
+                path: ".gitlab-ci.yml".into(),
+                contents: include_str!("../resources/templates/gitlab-ci.yml").replace("{{PHP}}", &p.php),
+            },
+            MIN,
+        )),
+    }
+
     if p.export_config_on_install {
         steps.push(step("config-export", "Export configuration", ddev(&["drush", "config:export", "-y"]), 5 * MIN));
     }
@@ -418,6 +476,25 @@ mod tests {
     fn drupal11_memcached_elasticsearch() {
         snapshot("drupal11-memcached-elasticsearch", |i| {
             i.services = vec!["memcached".into(), "elasticsearch".into()];
+        });
+    }
+
+    #[test]
+    fn drupal11_bundles_recipes_github_ci() {
+        snapshot("drupal11-bundles-recipes-github", |i| {
+            i.bundles = vec!["admin".into(), "dev".into()];
+            i.recipes = vec!["seo-tools".into(), "forms".into()];
+            i.ci = Ci::Github;
+        });
+    }
+
+    #[test]
+    fn drupal10_gitlab_ci() {
+        snapshot("drupal10-gitlab", |i| {
+            i.drupal = "10".into();
+            i.php = "8.2".into();
+            i.bundles = vec!["seo".into()];
+            i.ci = Ci::Gitlab;
         });
     }
 

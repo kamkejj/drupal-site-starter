@@ -1,0 +1,55 @@
+# Builds real sites with DDEV: Drupal 11 with every bundle and recipe, then
+# a clone of it installed from its config, and Drupal CMS. Slow, so it runs
+# weekly and on demand rather than on every push.
+name: Smoke
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - drupal: "11"
+            bundles: admin,seo,dev
+            recipes: seo-tools,accessibility-tools,privacy-basic,forms
+            clone: true
+          - drupal: cms
+            bundles: ""
+            recipes: ""
+            clone: false
+    env:
+      SMOKE_PARENT: ${{ runner.temp }}/smoke
+      SMOKE_DRUPAL: ${{ matrix.drupal }}
+      SMOKE_NAME: smoke-${{ matrix.drupal }}
+      SMOKE_BUNDLES: ${{ matrix.bundles }}
+      SMOKE_RECIPES: ${{ matrix.recipes }}
+      SMOKE_CI: github
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri's Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: ddev/github-action-setup-ddev@v1
+        with:
+          autostart: false
+      - run: mkdir -p "$SMOKE_PARENT"
+      - name: Create the site
+        run: cargo test --manifest-path src-tauri/Cargo.toml smoke_creates -- --ignored --nocapture
+      - name: Clone it and install from its config
+        if: matrix.clone
+        env:
+          SMOKE_REPO: ${{ runner.temp }}/smoke/smoke-${{ matrix.drupal }}
+          SMOKE_NAME: smoke-${{ matrix.drupal }}-clone
+        run: cargo test --manifest-path src-tauri/Cargo.toml smoke_clones -- --ignored --nocapture

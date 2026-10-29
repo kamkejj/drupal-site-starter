@@ -72,6 +72,7 @@ impl Executor for NativeExecutor {
             .current_dir(&spec.cwd)
             .env("PATH", &self.path)
             .env("DDEV_NONINTERACTIVE", "true")
+            .env("GIT_TERMINAL_PROMPT", "0")
             .stdin(if spec.stdin.is_some() { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -193,6 +194,12 @@ impl<E: Executor> Run<'_, E> {
                 command("ddev", args, stdin_secret.then(|| self.secret.0.clone()))
             }
             Action::Git { args } => command("git", args, None),
+            Action::GitClone { url } => {
+                let name = self.dir.file_name().ok_or("project folder has no name")?.to_string_lossy().into_owned();
+                let parent = self.dir.parent().ok_or("project folder has no parent")?;
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+                CommandSpec { cwd: parent.to_path_buf(), ..command("git", &vec!["clone".into(), "--progress".into(), "--".into(), url.clone(), name], None) }
+            }
             Action::CreateProjectDir => {
                 return std::fs::create_dir_all(self.dir).map_err(|e| e.to_string());
             }
@@ -362,7 +369,8 @@ pub(crate) mod tests {
     }
 }
 
-/// Real DDEV run. `SMOKE_PARENT=/some/dir SMOKE_DRUPAL=11 cargo test smoke -- --ignored --nocapture`
+/// Real DDEV run. `SMOKE_PARENT=/some/dir SMOKE_DRUPAL=11 cargo test smoke_creates -- --ignored --nocapture`
+/// Optional: SMOKE_SERVICES, SMOKE_BUNDLES and SMOKE_RECIPES (comma lists), SMOKE_CI, SMOKE_DB.
 #[cfg(test)]
 mod smoke {
     use super::*;
@@ -386,11 +394,15 @@ mod smoke {
             }
             Err(_) => release.default_database.clone(),
         };
-        i.services = std::env::var("SMOKE_SERVICES")
-            .unwrap_or_else(|_| "mailpit,adminer,redis".into())
-            .split(',')
-            .map(String::from)
-            .collect();
+        let list = |var: &str, default: &str| -> Vec<String> {
+            std::env::var(var).unwrap_or_else(|_| default.into()).split(',').filter(|s| !s.is_empty()).map(String::from).collect()
+        };
+        i.services = list("SMOKE_SERVICES", "mailpit,adminer,redis");
+        i.bundles = list("SMOKE_BUNDLES", "");
+        i.recipes = list("SMOKE_RECIPES", "");
+        if let Ok(ci) = std::env::var("SMOKE_CI") {
+            i.ci = serde_json::from_value(serde_json::Value::String(ci)).expect("SMOKE_CI is none, github or gitlab");
+        }
         let p = parse(&i, &compat).unwrap();
         let steps = crate::steps::build(&p, &compat);
         let exec = NativeExecutor { path: crate::env::login_shell_path() };

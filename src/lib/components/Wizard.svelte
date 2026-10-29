@@ -4,8 +4,10 @@
   import PasswordInput from "./PasswordInput.svelte";
   import {
     api,
+    availableFor,
     fieldErrors,
     type AppSettings,
+    type Ci,
     type Compat,
     type DbType,
     type FieldError,
@@ -31,8 +33,9 @@
     name: 0, parentDir: 0, siteName: 0, adminName: 0, adminEmail: 0,
     drupal: 1, php: 1,
     webserver: 2, database: 2, configSyncDir: 2,
-    services: 3, exportConfigOnInstall: 3, initGit: 3,
+    services: 3, bundles: 3, recipes: 3, ci: 3, exportConfigOnInstall: 3, initGit: 3,
   };
+  const CI_OPTIONS: [Ci, string][] = [["none", "None"], ["github", "GitHub Actions"], ["gitlab", "GitLab CI"]];
   const DB_LABEL: Record<DbType, string> = { mariadb: "MariaDB", mysql: "MySQL", postgres: "PostgreSQL" };
 
   const seed = untrack(() => ({
@@ -57,6 +60,9 @@
     webserver: "nginx-fpm",
     database: { ...first.defaultDatabase },
     services: [...seed.defaults.services],
+    bundles: [],
+    recipes: [],
+    ci: "none",
     adminName: seed.defaults.adminName,
     adminEmail: seed.defaults.adminEmail,
     siteName: "",
@@ -90,6 +96,9 @@
     input.database = dbOk ? { ...p.database } : { ...r.defaultDatabase };
     input.webserver = p.webserver;
     input.services = p.services.filter((id) => compat.services.some((s) => s.id === id));
+    input.bundles = (p.bundles ?? []).filter((id) => compat.bundles.some((b) => b.id === id && availableFor(b, r.id)));
+    input.recipes = (p.recipes ?? []).filter((id) => compat.recipes.some((x) => x.id === id && availableFor(x, r.id)));
+    input.ci = p.ci ?? "none";
     input.configSyncDir = p.configSyncDir;
     input.exportConfigOnInstall = p.exportConfigOnInstall;
     input.initGit = p.initGit;
@@ -97,10 +106,13 @@
   }
 
   async function savePreset() {
-    const { drupal, php, webserver, database, services, configSyncDir, exportConfigOnInstall, initGit } = $state.snapshot(input);
+    const { drupal, php, webserver, database, services, bundles, recipes, ci, configSyncDir, exportConfigOnInstall, initGit } =
+      $state.snapshot(input);
     const name = newPresetName.trim();
     try {
-      presets = await api.savePreset({ name, drupal, php, webserver, database, services, configSyncDir, exportConfigOnInstall, initGit });
+      presets = await api.savePreset({
+        name, drupal, php, webserver, database, services, bundles, recipes, ci, configSyncDir, exportConfigOnInstall, initGit,
+      });
       presetName = name;
       newPresetName = "";
       notice = `Saved the preset ${name}.`;
@@ -111,6 +123,8 @@
 
   const release = $derived(compat.drupal.find((r) => r.id === input.drupal) ?? first);
   const dbTypes = $derived(Object.keys(release.databases) as DbType[]);
+  const bundles = $derived(compat.bundles.filter((b) => availableFor(b, release.id)));
+  const recipes = $derived(compat.recipes.filter((r) => availableFor(r, release.id)));
   const nameTaken = $derived(taken.includes(input.name));
 
   api.existingProjects().then((names) => (taken = names));
@@ -127,6 +141,12 @@
     if (!r.databases[input.database.type]?.includes(input.database.version)) {
       input.database = { ...r.defaultDatabase };
     }
+    input.bundles = input.bundles.filter((b) => compat.bundles.some((x) => x.id === b && availableFor(x, id)));
+    input.recipes = input.recipes.filter((b) => compat.recipes.some((x) => x.id === b && availableFor(x, id)));
+  }
+
+  function toggle(list: "bundles" | "recipes", id: string) {
+    input[list] = input[list].includes(id) ? input[list].filter((x) => x !== id) : [...input[list], id];
   }
 
   function chooseDbType(type: DbType) {
@@ -145,7 +165,7 @@
     if (typeof dir === "string") input.parentDir = dir;
   }
 
-  function errorFor(field: keyof ProjectInput) {
+  function errorFor(field: FieldError["field"]) {
     return errors.find((e) => e.field === field)?.message;
   }
 
@@ -154,12 +174,12 @@
     if (STEPS[i] !== "Review") return;
     if (!input.siteName.trim()) input.siteName = displayName.trim();
     try {
-      plan = await api.plan(input);
+      plan = await api.plan({ kind: "create", input });
       errors = [];
     } catch (e) {
       plan = null;
       errors = fieldErrors(e);
-      if (errors.length) stepIndex = Math.min(...errors.map((x) => FIELD_STEP[x.field] ?? 0));
+      if (errors.length) stepIndex = Math.min(...errors.map((x) => FIELD_STEP[x.field as keyof ProjectInput] ?? 0));
     }
   }
 
@@ -324,6 +344,57 @@
           </button>
         {/each}
       </div>
+      {#if bundles.length}
+        <div class="space-y-2">
+          <span class="text-sm font-medium">Module bundles</span>
+          <div class="grid grid-cols-2 gap-2">
+            {#each bundles as b (b.id)}
+              {@const on = input.bundles.includes(b.id)}
+              <button
+                class="rounded-md border px-3 py-2 text-left text-sm {on ? 'border-drop bg-drop/5' : 'border-slate-200 dark:border-slate-700'}"
+                aria-pressed={on}
+                onclick={() => toggle("bundles", b.id)}
+              >
+                <span class="font-medium">{b.label}{on ? " ✓" : ""}</span>
+                <span class="block text-xs text-slate-500">{b.description}</span>
+              </button>
+            {/each}
+          </div>
+          {#if errorFor("bundles")}<p class="error">{errorFor("bundles")}</p>{/if}
+        </div>
+      {/if}
+      {#if recipes.length}
+        <div class="space-y-2">
+          <span class="text-sm font-medium">Recipes</span>
+          <div class="grid grid-cols-2 gap-2">
+            {#each recipes as r (r.id)}
+              {@const on = input.recipes.includes(r.id)}
+              <button
+                class="rounded-md border px-3 py-2 text-left text-sm {on ? 'border-drop bg-drop/5' : 'border-slate-200 dark:border-slate-700'}"
+                aria-pressed={on}
+                onclick={() => toggle("recipes", r.id)}
+              >
+                <span class="font-medium">{r.label}{on ? " ✓" : ""}</span>
+                <span class="block text-xs text-slate-500">{r.description}</span>
+              </button>
+            {/each}
+          </div>
+          {#if errorFor("recipes")}<p class="error">{errorFor("recipes")}</p>{/if}
+        </div>
+      {:else}
+        <p class="text-xs text-slate-500">Recipes need Drupal 11 or Drupal CMS.</p>
+      {/if}
+      <label class="field">
+        <span>CI pipeline</span>
+        <select class="input" bind:value={input.ci}>
+          {#each CI_OPTIONS as [value, label] (value)}<option {value}>{label}</option>{/each}
+        </select>
+        {#if input.ci === "gitlab"}
+          <small class="text-slate-500">Runs lint, analyse and unit tests in a PHP image. Kernel and functional tests stay local.</small>
+        {:else if input.ci === "github"}
+          <small class="text-slate-500">Runs ddev composer lint, analyse and test with DDEV's GitHub action.</small>
+        {/if}
+      </label>
       <p class="text-xs text-slate-500">
         Always included: drupal/core-dev with PHPUnit, PHPCS (Drupal and DrupalPractice) and PHPStan, plus
         <code>composer lint</code>, <code>composer analyse</code> and <code>composer test</code>.
@@ -340,6 +411,18 @@
         <dt class="text-slate-500">Hostname</dt><dd class="font-mono">{input.name}.ddev.site</dd>
         <dt class="text-slate-500">Drupal</dt><dd>{release.label}, PHP {input.php}</dd>
         <dt class="text-slate-500">Stack</dt><dd>{input.webserver}, {DB_LABEL[input.database.type]} {input.database.version}</dd>
+        {#if input.bundles.length || input.recipes.length}
+          <dt class="text-slate-500">Add-ons</dt>
+          <dd>
+            {[
+              ...compat.bundles.filter((b) => input.bundles.includes(b.id)).map((b) => b.label),
+              ...compat.recipes.filter((r) => input.recipes.includes(r.id)).map((r) => `${r.label} recipe`),
+            ].join(", ")}
+          </dd>
+        {/if}
+        {#if input.ci !== "none"}
+          <dt class="text-slate-500">CI</dt><dd>{CI_OPTIONS.find(([v]) => v === input.ci)?.[1]}</dd>
+        {/if}
         <dt class="text-slate-500">Steps</dt><dd>{plan.steps.length}</dd>
       </dl>
       {#if plan.folderWarning}<p class="text-sm text-amber-700">{plan.folderWarning}</p>{/if}

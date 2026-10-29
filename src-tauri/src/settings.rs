@@ -13,6 +13,8 @@ pub struct AppSettings {
     pub services: Vec<String>,
     pub config_sync_dir: String,
     pub ide: String,
+    /// Base URL for compat.json and app updates. Empty means never check.
+    pub update_url: String,
 }
 
 impl Default for AppSettings {
@@ -25,6 +27,7 @@ impl Default for AppSettings {
             services: vec!["mailpit".into(), "adminer".into()],
             config_sync_dir: "../config/sync".into(),
             ide: "code".into(),
+            update_url: String::new(),
         }
     }
 }

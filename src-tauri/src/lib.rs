@@ -1,3 +1,4 @@
+mod clone;
 mod compat;
 mod config;
 mod env;
@@ -8,24 +9,35 @@ mod script;
 mod settings;
 mod sites;
 mod steps;
+mod updates;
 
 use compat::Compat;
 use config::{FieldError, Project, ProjectInput};
-use runner::{NativeExecutor, Run, RunEvent, Secret};
-use serde::Serialize;
+use runner::{NativeExecutor, Run, RunEvent, RunState, Secret};
+use serde::{Deserialize, Serialize};
 use settings::AppSettings;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::watch;
 
 struct AppState {
-    compat: Compat,
+    /// Bundled, or a newer downloaded copy; replaced when an update arrives.
+    compat: RwLock<Compat>,
     exec: NativeExecutor,
     cancel: Mutex<Option<watch::Sender<bool>>>,
+    /// The app update found by the last check, kept for install.
+    update: Mutex<Option<tauri_plugin_updater::Update>>,
+}
+
+impl AppState {
+    fn compat(&self) -> Compat {
+        self.compat.read().expect("lock").clone()
+    }
 }
 
 fn data_file(app: &AppHandle, parts: &[&str]) -> Result<PathBuf, String> {
@@ -42,17 +54,100 @@ fn presets_file(app: &AppHandle) -> Result<PathBuf, String> {
     data_file(app, &["presets.json"])
 }
 
+fn compat_cache_file(app: &AppHandle) -> Result<PathBuf, String> {
+    data_file(app, &["compat.json"])
+}
+
 fn run_state_file(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
     data_file(app, &["runs", &format!("{name}.json")])
 }
 
 fn parse(state: &AppState, input: &ProjectInput) -> Result<Project, Vec<FieldError>> {
-    config::parse(input, &state.compat)
+    config::parse(input, &state.compat())
+}
+
+/// A run the Run screen drives: creating a new site or cloning one.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum Job {
+    Create { input: ProjectInput },
+    Clone { input: clone::CloneInput },
+}
+
+struct Resolved {
+    name: String,
+    dir: PathBuf,
+    steps: Vec<steps::Step>,
+    script: Option<String>,
+    needs_password: bool,
+}
+
+fn resolve(state: &AppState, job: &Job, resume: bool) -> Result<Resolved, Vec<FieldError>> {
+    let compat = state.compat();
+    Ok(match job {
+        Job::Create { input } => {
+            let p = config::parse(input, &compat)?;
+            let steps = steps::build(&p, &compat);
+            Resolved { script: Some(script::render(&p, &steps)), name: p.name, dir: p.dir, steps, needs_password: true }
+        }
+        Job::Clone { input } => {
+            let p = clone::parse(input, &compat)?;
+            if !resume {
+                clone::check_folder(&p.dir).map_err(|e| vec![e])?;
+            }
+            Resolved { steps: clone::build(&p), needs_password: p.needs_password(), name: p.name, dir: p.dir, script: None }
+        }
+    })
+}
+
+fn resolve_err(state: &AppState, job: &Job, resume: bool) -> Result<Resolved, String> {
+    resolve(state, job, resume).map_err(|e| e.into_iter().map(|f| f.message).collect::<Vec<_>>().join(" "))
 }
 
 #[tauri::command]
 fn get_compat(state: State<AppState>) -> Compat {
-    state.compat.clone()
+    state.compat()
+}
+
+#[tauri::command]
+fn suggested_clone_name(url: String) -> String {
+    clone::suggested_name(&url)
+}
+
+#[tauri::command]
+async fn check_compat_update(app: AppHandle, state: State<'_, AppState>) -> Result<updates::CompatUpdate, String> {
+    let url = updates::endpoint(&AppSettings::load(&settings_file(&app)?).update_url, "compat.json")?;
+    let text = updates::download(&url).await?;
+    let (next, update) = updates::accept_compat(&state.compat(), &text, &compat_cache_file(&app)?)?;
+    *state.compat.write().expect("lock") = next;
+    Ok(update)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppUpdate {
+    version: String,
+    current_version: String,
+    notes: Option<String>,
+}
+
+#[tauri::command]
+async fn check_app_update(app: AppHandle, state: State<'_, AppState>) -> Result<Option<AppUpdate>, String> {
+    let url = updates::endpoint(&AppSettings::load(&settings_file(&app)?).update_url, "latest.json")?;
+    let url = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
+    let updater = app.updater_builder().endpoints(vec![url]).map_err(|e| e.to_string())?.build().map_err(|e| e.to_string())?;
+    let update = updater.check().await.map_err(|e| format!("Could not check for app updates: {e}"))?;
+    let info = update.as_ref().map(|u| AppUpdate { version: u.version.clone(), current_version: u.current_version.clone(), notes: u.body.clone() });
+    *state.update.lock().expect("lock") = update;
+    Ok(info)
+}
+
+/// Downloads and installs the update the last check found, then restarts.
+#[tauri::command]
+async fn install_app_update(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let update = state.update.lock().expect("lock").take().ok_or("Check for updates first.")?;
+    update.download_and_install(|_, _| {}, || {}).await.map_err(|e| format!("Update failed: {e}"))?;
+    app.restart()
 }
 
 #[tauri::command]
@@ -124,7 +219,7 @@ fn export_presets(app: AppHandle, path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn preflight(state: State<'_, AppState>, projects_dir: String) -> Result<Vec<preflight::CheckResult>, String> {
-    let (path, compat) = (state.exec.path.clone(), state.compat.clone());
+    let (path, compat) = (state.exec.path.clone(), state.compat());
     tauri::async_runtime::spawn_blocking(move || preflight::run(&path, &compat, Path::new(&projects_dir)))
         .await
         .map_err(|e| e.to_string())
@@ -163,30 +258,31 @@ async fn site_action(state: State<'_, AppState>, name: String, action: sites::Si
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Plan {
+    name: String,
     steps: Vec<steps::Step>,
-    script: String,
+    script: Option<String>,
     dir: String,
     folder_warning: Option<String>,
+    needs_password: bool,
 }
 
 #[tauri::command]
-fn plan_project(state: State<AppState>, input: ProjectInput) -> Result<Plan, Vec<FieldError>> {
-    let p = parse(&state, &input)?;
-    let steps = steps::build(&p, &state.compat);
-    let folder_warning = std::fs::read_dir(&p.dir).ok().map(|mut entries| {
+fn plan_project(state: State<AppState>, job: Job) -> Result<Plan, Vec<FieldError>> {
+    let r = resolve(&state, &job, false)?;
+    let folder_warning = std::fs::read_dir(&r.dir).ok().map(|mut entries| {
         if entries.next().is_some() {
-            format!("{} already exists and isn't empty.", p.dir.display())
+            format!("{} already exists and isn't empty.", r.dir.display())
         } else {
-            format!("{} already exists.", p.dir.display())
+            format!("{} already exists.", r.dir.display())
         }
     });
-    Ok(Plan { script: script::render(&p, &steps), dir: p.dir.display().to_string(), steps, folder_warning })
+    Ok(Plan { name: r.name, script: r.script, dir: r.dir.display().to_string(), steps: r.steps, folder_warning, needs_password: r.needs_password })
 }
 
 #[tauri::command]
 fn export_script(state: State<AppState>, input: ProjectInput, path: String) -> Result<(), String> {
     let p = parse(&state, &input).map_err(|e| format!("{e:?}"))?;
-    let script = script::render(&p, &steps::build(&p, &state.compat));
+    let script = script::render(&p, &steps::build(&p, &state.compat()));
     std::fs::write(&path, script).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
@@ -200,17 +296,18 @@ fn export_script(state: State<AppState>, input: ProjectInput, path: String) -> R
 async fn start_run(
     app: AppHandle,
     state: State<'_, AppState>,
-    input: ProjectInput,
+    job: Job,
     password: Option<String>,
     resume: bool,
     on_event: Channel<RunEvent>,
 ) -> Result<String, String> {
-    let p = parse(&state, &input).map_err(|e| format!("{e:?}"))?;
-    let password = password
-        .filter(|p| !p.is_empty())
-        .or_else(settings::admin_password)
-        .ok_or("Set an admin password in Settings or for this project.")?;
-    let steps = steps::build(&p, &state.compat);
+    let p = resolve_err(&state, &job, resume)?;
+    let password = match password.filter(|p| !p.is_empty()).or_else(settings::admin_password) {
+        Some(pw) => pw,
+        None if !p.needs_password => String::new(),
+        None => return Err("Set an admin password in Settings or for this project.".into()),
+    };
+    let steps = p.steps;
     let state_path = run_state_file(&app, &p.name)?;
     if !resume {
         let _ = std::fs::remove_file(&state_path);
@@ -254,8 +351,8 @@ fn ide_program(ide: &str) -> Result<&str, String> {
 }
 
 #[tauri::command]
-async fn open_in_ide(app: AppHandle, state: State<'_, AppState>, input: ProjectInput) -> Result<(), String> {
-    let p = parse(&state, &input).map_err(|e| format!("{e:?}"))?;
+async fn open_in_ide(app: AppHandle, state: State<'_, AppState>, job: Job) -> Result<(), String> {
+    let p = resolve_project(&state, &job)?;
     let settings = AppSettings::load(&settings_file(&app)?);
     let ide = ide_program(&settings.ide)?;
     tokio::process::Command::new(ide)
@@ -267,8 +364,8 @@ async fn open_in_ide(app: AppHandle, state: State<'_, AppState>, input: ProjectI
 }
 
 #[tauri::command]
-async fn login_link(state: State<'_, AppState>, input: ProjectInput) -> Result<String, String> {
-    let p = parse(&state, &input).map_err(|e| format!("{e:?}"))?;
+async fn login_link(state: State<'_, AppState>, job: Job) -> Result<String, String> {
+    let p = resolve_project(&state, &job)?;
     let out = tokio::process::Command::new("ddev")
         .args(["drush", "user:login", "--no-browser"])
         .current_dir(&p.dir)
@@ -284,14 +381,22 @@ async fn login_link(state: State<'_, AppState>, input: ProjectInput) -> Result<S
     }
 }
 
+/// The name and folder of a job whose run already started.
+fn resolve_project(state: &AppState, job: &Job) -> Result<Resolved, String> {
+    resolve_err(state, job, true)
+}
+
 /// `ddev delete -Oy` plus removing the folder. Refuses to remove a folder that
-/// isn't this DDEV project, so a wrong path can't wipe unrelated files.
+/// isn't this DDEV project, or one this app's run didn't start, so a wrong
+/// path can't wipe unrelated files.
 #[tauri::command]
-async fn delete_project(app: AppHandle, state: State<'_, AppState>, input: ProjectInput) -> Result<(), String> {
-    let p = parse(&state, &input).map_err(|e| format!("{e:?}"))?;
+async fn delete_project(app: AppHandle, state: State<'_, AppState>, job: Job) -> Result<(), String> {
+    let p = resolve_project(&state, &job)?;
     let ddev_config = std::fs::read_to_string(p.dir.join(".ddev/config.yaml")).unwrap_or_default();
     let ours = ddev_config.lines().any(|l| l.trim() == format!("name: {}", p.name));
     let empty = std::fs::read_dir(&p.dir).map(|mut d| d.next().is_none()).unwrap_or(true);
+    let state_file = run_state_file(&app, &p.name)?;
+    let made_here = RunState::load(&state_file).completed.iter().any(|id| id == "mkdir" || id == "git-clone");
     if ours {
         let status = tokio::process::Command::new("ddev")
             .args(["delete", "-Oy", &p.name])
@@ -304,30 +409,39 @@ async fn delete_project(app: AppHandle, state: State<'_, AppState>, input: Proje
             return Err(format!("ddev delete exited with {status}"));
         }
     }
-    if ours || empty {
+    if ours || empty || made_here {
         if p.dir.exists() {
             std::fs::remove_dir_all(&p.dir).map_err(|e| e.to_string())?;
         }
     } else {
         return Err(format!("{} is not the DDEV project {}, so it was left alone.", p.dir.display(), p.name));
     }
-    let _ = std::fs::remove_file(run_state_file(&app, &p.name)?);
+    let _ = std::fs::remove_file(state_file);
     Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let state = AppState {
-        compat: Compat::bundled(),
-        exec: NativeExecutor { path: env::login_shell_path() },
-        cancel: Mutex::new(None),
-    };
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(state)
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            let compat = updates::load_compat(&compat_cache_file(app.handle())?);
+            app.manage(AppState {
+                compat: RwLock::new(compat),
+                exec: NativeExecutor { path: env::login_shell_path() },
+                cancel: Mutex::new(None),
+                update: Mutex::new(None),
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_compat,
+            suggested_clone_name,
+            check_compat_update,
+            check_app_update,
+            install_app_update,
             machine_name,
             load_settings,
             save_settings,

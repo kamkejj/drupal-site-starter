@@ -2,7 +2,7 @@
 //! or admin account. Stored as JSON; imported and exported as JSON or YAML.
 
 use crate::compat::Database;
-use crate::config::Webserver;
+use crate::config::{Ci, Webserver};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -15,6 +15,12 @@ pub struct Preset {
     pub webserver: Webserver,
     pub database: Database,
     pub services: Vec<String>,
+    #[serde(default)]
+    pub bundles: Vec<String>,
+    #[serde(default)]
+    pub recipes: Vec<String>,
+    #[serde(default)]
+    pub ci: Ci,
     pub config_sync_dir: String,
     pub export_config_on_install: bool,
     pub init_git: bool,
@@ -85,6 +91,9 @@ mod tests {
             webserver: Webserver::NginxFpm,
             database: Database { kind: DbType::Postgres, version: "17".into() },
             services: vec!["redis".into(), "solr".into()],
+            bundles: vec!["seo".into()],
+            recipes: vec![],
+            ci: Ci::Gitlab,
             config_sync_dir: "../config/sync".into(),
             export_config_on_install: true,
             init_git: false,
@@ -120,5 +129,14 @@ mod tests {
         assert!(read(&path).is_err(), "blank name");
         std::fs::write(&path, r#"[{"name": "x"}]"#).unwrap();
         assert!(read(&path).is_err(), "missing fields");
+    }
+
+    #[test]
+    fn presets_saved_before_bundles_still_load() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("old.json");
+        std::fs::write(&path, r#"[{"name":"Old","drupal":"11","php":"8.3","webserver":"nginx-fpm","database":{"type":"mariadb","version":"10.11"},"services":[],"configSyncDir":"../config/sync","exportConfigOnInstall":true,"initGit":true}]"#).unwrap();
+        let p = &read(&path).unwrap()[0];
+        assert!(p.bundles.is_empty() && p.recipes.is_empty() && p.ci == Ci::None);
     }
 }

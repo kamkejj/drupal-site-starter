@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import PasswordInput from "./PasswordInput.svelte";
-  import { api, type AppSettings, type Compat, type Preset } from "$lib/api";
+  import { api, type AppSettings, type AppUpdate, type Compat, type Preset } from "$lib/api";
 
   let {
     compat,
@@ -10,12 +10,14 @@
     hasPassword,
     onSaved,
     onCancel,
+    onCompatUpdated,
   }: {
     compat: Compat;
     settings: AppSettings;
     hasPassword: boolean;
     onSaved: (s: AppSettings, hasPassword: boolean) => void;
     onCancel: () => void;
+    onCompatUpdated: () => void;
   } = $props();
 
   let draft = $state(untrack(() => $state.snapshot(settings)));
@@ -63,6 +65,43 @@
       return `Exported ${presets.length} presets to ${path}.`;
     });
 
+  let checking = $state(false);
+  let updateNotes = $state<string[]>([]);
+  let appUpdate = $state<AppUpdate | null>(null);
+  let installing = $state(false);
+
+  /** Saves first, so the checks use the URL as typed. */
+  async function checkUpdates() {
+    checking = true;
+    updateNotes = [];
+    appUpdate = null;
+    try {
+      await api.saveSettings(draft, null);
+      const [c, a] = await Promise.allSettled([api.checkCompatUpdate(), api.checkAppUpdate()]);
+      if (c.status === "fulfilled") {
+        updateNotes.push(c.value.updated ? `Drupal and service data updated to revision ${c.value.revision}.` : `Drupal and service data are up to date (revision ${c.value.revision}).`);
+        if (c.value.updated) onCompatUpdated();
+      } else updateNotes.push(String(c.reason));
+      if (a.status === "fulfilled") {
+        appUpdate = a.value;
+        if (!a.value) updateNotes.push("The app is up to date.");
+      } else updateNotes.push(String(a.reason));
+    } catch (e) {
+      updateNotes.push(String(e));
+    }
+    checking = false;
+  }
+
+  async function installUpdate() {
+    installing = true;
+    try {
+      await api.installAppUpdate();
+    } catch (e) {
+      updateNotes.push(String(e));
+      installing = false;
+    }
+  }
+
   async function save() {
     try {
       await api.saveSettings(draft, password || null);
@@ -100,6 +139,26 @@
   <div class="grid grid-cols-2 gap-4">
     <label class="field"><span>Config sync path</span><input class="input" bind:value={draft.configSyncDir} /></label>
     <label class="field"><span>IDE command</span><input class="input" bind:value={draft.ide} /></label>
+  </div>
+
+  <div class="field">
+    <label for="update-url">Update URL</label>
+    <div class="flex gap-2">
+      <input id="update-url" class="input flex-1 font-mono" bind:value={draft.updateUrl} placeholder="https://example.com/drupal-ddev-creator" />
+      <button class="btn-ghost" disabled={!draft.updateUrl.trim() || checking} onclick={checkUpdates}>
+        {checking ? "Checking…" : "Check now"}
+      </button>
+    </div>
+    <small class="text-slate-500">
+      The app reads compat.json (Drupal, PHP and service data, revision {compat.revision}) and latest.json (app updates) from here. Leave it empty to never check.
+    </small>
+    {#each updateNotes as note}<small class="text-slate-500">{note}</small>{/each}
+    {#if appUpdate}
+      <div class="flex items-center justify-between rounded-md border border-drop/40 bg-drop/5 px-3 py-2 text-sm">
+        <span>Version {appUpdate.version} is available (you have {appUpdate.currentVersion}).</span>
+        <button class="btn-primary" disabled={installing} onclick={installUpdate}>{installing ? "Installing…" : "Install and restart"}</button>
+      </div>
+    {/if}
   </div>
 
   <div class="field">

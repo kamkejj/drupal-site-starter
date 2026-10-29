@@ -1,4 +1,4 @@
-use crate::compat::{Compat, Database, DrupalRelease, Service};
+use crate::compat::{Bundle, Compat, Database, DrupalRelease, Recipe, Service};
 use serde::{Deserialize, Serialize};
 use std::path::{Component, Path, PathBuf};
 
@@ -21,6 +21,16 @@ impl Webserver {
     }
 }
 
+/// A CI pipeline file for the new project's own repository.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Ci {
+    #[default]
+    None,
+    Github,
+    Gitlab,
+}
+
 /// What the wizard sends. Untrusted until `parse` turns it into a `Project`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +42,12 @@ pub struct ProjectInput {
     pub webserver: Webserver,
     pub database: Database,
     pub services: Vec<String>,
+    #[serde(default)]
+    pub bundles: Vec<String>,
+    #[serde(default)]
+    pub recipes: Vec<String>,
+    #[serde(default)]
+    pub ci: Ci,
     pub admin_name: String,
     pub admin_email: String,
     pub site_name: String,
@@ -49,6 +65,9 @@ pub struct Project {
     pub webserver: Webserver,
     pub database: Database,
     pub services: Vec<Service>,
+    pub bundles: Vec<Bundle>,
+    pub recipes: Vec<Recipe>,
+    pub ci: Ci,
     pub admin_name: String,
     pub admin_email: String,
     pub site_name: String,
@@ -117,6 +136,30 @@ pub fn enclosing_ddev_project(dir: &Path) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
+pub const ADMIN_NAME_RULE: &str = "Use letters, numbers, dots, hyphens, underscores or @.";
+pub const EMAIL_RULE: &str = "Enter a valid email address.";
+
+pub fn is_admin_name(name: &str) -> bool {
+    !name.is_empty() && name.len() <= 60 && name.chars().all(|c| c.is_ascii_alphanumeric() || "._@-".contains(c))
+}
+
+pub fn is_email(email: &str) -> bool {
+    email.split_once('@').is_some_and(|(local, domain)| {
+        !local.is_empty() && domain.contains('.') && !domain.starts_with('.')
+    }) && !email.chars().any(|c| c.is_whitespace() || c.is_control() || "\"'\\".contains(c))
+}
+
+/// The parent folder must exist and not sit inside another DDEV project.
+pub fn check_parent(parent: &Path) -> Result<(), String> {
+    if !parent.is_absolute() || !parent.is_dir() {
+        Err("Choose an existing folder.".into())
+    } else if let Some(outer) = enclosing_ddev_project(parent) {
+        Err(format!("This folder is inside the DDEV project at {}.", outer.display()))
+    } else {
+        Ok(())
+    }
+}
+
 pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<FieldError>> {
     let mut errors = Vec::new();
     let mut err = |field, message: &str| {
@@ -128,10 +171,8 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
     }
 
     let parent = PathBuf::from(&input.parent_dir);
-    if !parent.is_absolute() || !parent.is_dir() {
-        err("parentDir", "Choose an existing folder.");
-    } else if let Some(outer) = enclosing_ddev_project(&parent) {
-        err("parentDir", &format!("This folder is inside the DDEV project at {}.", outer.display()));
+    if let Err(e) = check_parent(&parent) {
+        err("parentDir", &e);
     }
 
     let release = compat.release(&input.drupal);
@@ -159,19 +200,29 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
         }
     }
 
-    let admin_ok = !input.admin_name.is_empty()
-        && input.admin_name.len() <= 60
-        && input.admin_name.chars().all(|c| c.is_ascii_alphanumeric() || "._@-".contains(c));
-    if !admin_ok {
-        err("adminName", "Use letters, numbers, dots, hyphens, underscores or @.");
+    let mut bundles = Vec::new();
+    for id in &input.bundles {
+        match compat.bundle(id) {
+            Some(b) if release.is_none_or(|r| b.available_for(&r.id)) => bundles.push(b.clone()),
+            Some(b) => err("bundles", &format!("{} isn't available for this Drupal version.", b.label)),
+            None => err("bundles", &format!("Unknown module bundle \"{id}\".")),
+        }
     }
 
-    let email = input.admin_email.as_str();
-    let email_ok = email.split_once('@').is_some_and(|(local, domain)| {
-        !local.is_empty() && domain.contains('.') && !domain.starts_with('.')
-    }) && !email.chars().any(|c| c.is_whitespace() || c.is_control() || "\"'\\".contains(c));
-    if !email_ok {
-        err("adminEmail", "Enter a valid email address.");
+    let mut recipes = Vec::new();
+    for id in &input.recipes {
+        match compat.recipe(id) {
+            Some(r) if release.is_none_or(|rel| r.available_for(&rel.id)) => recipes.push(r.clone()),
+            Some(r) => err("recipes", &format!("The {} recipe isn't available for this Drupal version.", r.label)),
+            None => err("recipes", &format!("Unknown recipe \"{id}\".")),
+        }
+    }
+
+    if !is_admin_name(&input.admin_name) {
+        err("adminName", ADMIN_NAME_RULE);
+    }
+    if !is_email(&input.admin_email) {
+        err("adminEmail", EMAIL_RULE);
     }
 
     if input.site_name.trim().is_empty() || input.site_name.chars().any(char::is_control) {
@@ -196,6 +247,9 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
             webserver: input.webserver,
             database: input.database.clone(),
             services,
+            bundles,
+            recipes,
+            ci: input.ci,
             admin_name: input.admin_name.clone(),
             admin_email: input.admin_email.clone(),
             site_name: input.site_name.trim().to_string(),
@@ -221,6 +275,9 @@ pub(crate) mod tests {
             webserver: Webserver::NginxFpm,
             database: Database { kind: DbType::Mariadb, version: "10.11".into() },
             services: vec!["mailpit".into(), "adminer".into()],
+            bundles: vec![],
+            recipes: vec![],
+            ci: Ci::None,
             admin_name: "admin".into(),
             admin_email: "me@example.com".into(),
             site_name: "My Site".into(),
@@ -284,6 +341,22 @@ pub(crate) mod tests {
         let nested = tmp.path().join("sub");
         std::fs::create_dir(&nested).unwrap();
         assert_eq!(fields(parse(&input(&nested), &Compat::bundled())), vec!["parentDir"]);
+    }
+
+    #[test]
+    fn bundles_and_recipes_must_suit_the_release() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut i = input(tmp.path());
+        i.bundles = vec!["seo".into()];
+        i.recipes = vec!["forms".into()];
+        let p = parse(&i, &Compat::bundled()).unwrap();
+        assert_eq!((p.bundles.len(), p.recipes.len()), (1, 1));
+
+        i.drupal = "10".into();
+        assert_eq!(fields(parse(&i, &Compat::bundled())), vec!["recipes"], "recipes need Drupal 11");
+        i.bundles = vec!["nope".into()];
+        i.recipes = vec![];
+        assert_eq!(fields(parse(&i, &Compat::bundled())), vec!["bundles"]);
     }
 
     #[test]

@@ -2,13 +2,16 @@
   import { untrack } from "svelte";
   import { ask } from "@tauri-apps/plugin-dialog";
   import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { api, type Plan, type ProjectInput, type RunEvent, type StepStatus } from "$lib/api";
+  import { api, type Job, type Plan, type RunEvent, type StepStatus } from "$lib/api";
 
   let {
-    input,
+    job,
     password,
     onBack,
-  }: { input: ProjectInput; password: string | null; onBack: () => void } = $props();
+  }: { job: Job; password: string | null; onBack: () => void } = $props();
+
+  const name = $derived(job.input.name);
+  const verb = $derived(job.kind === "clone" ? "Cloning" : "Creating");
 
   type Phase = "running" | "failed" | "cancelled" | "done";
   const MAX_LINES = 4000;
@@ -49,7 +52,7 @@
     if (!resume) statuses = {};
     else if (failed) delete statuses[failed[0]];
     try {
-      logPath = await api.startRun(input, password, resume, onEvent);
+      logPath = await api.startRun(job, password, resume, onEvent);
     } catch (e) {
       error = String(e);
       phase = "failed";
@@ -66,13 +69,13 @@
   }
 
   async function deleteAndStartOver() {
-    const ok = await ask(`Delete the DDEV project ${input.name} and remove ${plan?.dir}?`, {
+    const ok = await ask(`Delete the DDEV project ${name} and remove ${plan?.dir}?`, {
       title: "Delete and start over",
       kind: "warning",
     });
     if (!ok) return;
     try {
-      await api.deleteProject(input);
+      await api.deleteProject(job);
       lines = [];
       start(false);
     } catch (e) {
@@ -80,10 +83,16 @@
     }
   }
 
-  untrack(() => api.plan(input)).then((p) => {
-    plan = p;
-    start(false);
-  });
+  untrack(() => api.plan(job)).then(
+    (p) => {
+      plan = p;
+      start(false);
+    },
+    (e) => {
+      error = Array.isArray(e) ? e.map((f) => f.message).join(" ") : String(e);
+      phase = "failed";
+    },
+  );
 
   const icon = (s?: StepStatus) =>
     !s ? "○" : s.status === "running" ? "◐" : s.status === "failed" ? "✕" : s.status === "skipped" ? "↷" : "✓";
@@ -116,9 +125,9 @@
     <div class="card flex flex-wrap items-center justify-between gap-3 py-3">
       <div class="min-w-0 text-sm">
         {#if phase === "running"}
-          <span class="font-medium">Creating {input.name}…</span>
+          <span class="font-medium">{verb} {name}…</span>
         {:else if phase === "done"}
-          <span class="font-medium text-emerald-700">{input.name} is ready.</span>
+          <span class="font-medium text-emerald-700">{name} is ready.</span>
         {:else if phase === "cancelled"}
           <span class="font-medium text-amber-700">Cancelled.</span>
         {:else}
@@ -135,9 +144,11 @@
           <button class="btn-ghost" onclick={() => api.cancelRun()}>Cancel</button>
         {:else if phase === "done"}
           <button class="btn-ghost" onclick={() => plan && revealItemInDir(plan.dir)}>Show folder</button>
-          <button class="btn-ghost" onclick={() => act(() => api.openInIde(input))}>Open in IDE</button>
-          <button class="btn-ghost" onclick={() => act(async () => openUrl(await api.loginLink(input)))}>Log in as admin</button>
-          <button class="btn-primary" onclick={() => act(async () => openUrl(await api.projectUrl(input.name)))}>Open site</button>
+          <button class="btn-ghost" onclick={() => act(() => api.openInIde(job))}>Open in IDE</button>
+          {#if job.kind === "create" || job.input.database.kind !== "none"}
+            <button class="btn-ghost" onclick={() => act(async () => openUrl(await api.loginLink(job)))}>Log in as admin</button>
+          {/if}
+          <button class="btn-primary" onclick={() => act(async () => openUrl(await api.projectUrl(name)))}>Open site</button>
           <button class="btn-ghost" onclick={onBack}>New site</button>
         {:else}
           {#if failed?.[1].retry.kind !== "startOver"}

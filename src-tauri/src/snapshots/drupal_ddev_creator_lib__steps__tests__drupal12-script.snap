@@ -157,6 +157,7 @@ cat > .gitignore <<'DDEV_CREATOR_EOF'
 /web/themes/contrib/
 /web/profiles/contrib/
 /web/libraries/
+/recipes/
 /web/sites/*/files/
 /web/sites/*/private/
 /web/sites/*/settings.local.php

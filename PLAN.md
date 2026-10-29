@@ -31,6 +31,8 @@ DDEV, based on a set of user-selected options.
 - **Default services preset.**
 - **Default config sync path:** `../config/sync`.
 - **Default IDE** for the "Open in IDE" action.
+- **Update URL:** the base URL for `compat.json` and app updates (see 8.1).
+  Empty means the app never checks.
 
 ### 2.2 Project Basics
 
@@ -148,7 +150,52 @@ The app also generates these files:
 - Import (`drush cim`) and Export (`drush cex`) buttons live on the Sites
   dashboard.
 
-### 2.9 Git
+### 2.9 Module Bundles and Recipes
+
+Both live in `compat.json` and are filtered by the Drupal choice.
+
+- **Module bundles** are contrib modules added after install: Admin
+  essentials (Admin Toolbar), SEO basics (Pathauto, Metatag, Redirect, Simple
+  XML Sitemap) and Developer tools (Devel, Stage File Proxy, as dev
+  dependencies). Not offered for the Drupal 12 preview yet.
+- **Recipes** are Drupal CMS recipes from Packagist (SEO tools,
+  Accessibility tools, Privacy basics, Forms), for Drupal 11 and Drupal CMS.
+  The app requires them in one `composer require`, applies each with
+  `drush recipe ../recipes/<name>` and rebuilds caches. `/recipes/` is
+  git-ignored.
+
+### 2.10 CI Templates
+
+An optional pipeline file for the new project's own repository:
+
+- **GitHub Actions** (`.github/workflows/ci.yml`): DDEV's setup action, then
+  `ddev composer install`, `lint`, `analyse` and `test`.
+- **GitLab CI** (`.gitlab-ci.yml`): a `php:<version>-cli` image runs
+  `composer lint`, `composer analyse` and the unit suite. Kernel and
+  functional tests need DDEV's database and web server, so they stay local.
+
+### 2.11 Clone an Existing Project
+
+A "Clone from Git" screen takes a repository URL (HTTPS, SSH, `git://`,
+`file://` or a local path), a project name (suggested from the URL) and a
+folder, then:
+
+1. `git clone -- <url> <folder>` (prompts are off, so a missing SSH key fails
+   instead of hanging).
+2. `ddev config` with the chosen Drupal version's type, only if the repo has
+   no `.ddev/config.yaml`; then `ddev config --project-name=<name>`, so a
+   committed config doesn't clash with the original copy's name.
+3. `ddev start` and `ddev composer install`.
+4. The database, one of:
+   - **Install from the repo's config:** `drush site:install
+     --existing-config`, then set the admin password.
+   - **Import a dump:** `ddev import-db --file=<dump>`, then `drush cr`.
+   - **None:** the user imports one later.
+
+It uses the same runner as Create: live log, retry, resume and delete and
+start over.
+
+### 2.12 Git
 
 - `git init`, a Drupal `.gitignore` (vendor, `web/core`, contrib, files,
   `settings.local.php`, `.ddev` generated files) and a first commit after
@@ -362,7 +409,12 @@ type ProjectConfig = {
   back canned output, so UI and pipeline tests run in seconds.
 - **Snapshot tests:** the step list and exported script for a set of sample
   configs.
-- **Smoke test:** one real DDEV run in CI (Linux) for Drupal 11 and Drupal CMS.
+- **End-to-end tests:** Playwright drives the UI in Chromium against a fake
+  Tauri backend (`tests/e2e/fake-backend.ts`), so they need no DDEV or Rust
+  build: `pnpm test:e2e`.
+- **Smoke test:** real DDEV runs in CI (Linux, `.github/workflows/smoke.yml`,
+  weekly and on demand): Drupal 11 with every bundle and recipe, a clone of it
+  installed from its config, and Drupal CMS.
 
 ---
 
@@ -370,34 +422,55 @@ type ProjectConfig = {
 
 ### MVP (macOS and Linux)
 
-- Preflight checks, PATH fix and non-interactive runs
-- Global settings, with secrets in the keychain
-- Wizard with filtering based on `compat.json`
-- Pipeline runner with a live log, saved logs, cancel, retry and resume
-- "Export as script" (reuses the same steps)
-- Code quality and testing files always generated
-- Config sync directory setup
-- Git init with `.gitignore`
-- Redis and Solr wired into Drupal; other services as "container only"
+- ✅ Preflight checks, PATH fix and non-interactive runs
+- ✅ Global settings, with secrets in the keychain
+- ✅ Wizard with filtering based on `compat.json`
+- ✅ Pipeline runner with a live log, saved logs, cancel, retry and resume
+- ✅ "Export as script" (reuses the same steps)
+- ✅ Code quality and testing files always generated
+- ✅ Config sync directory setup
+- ✅ Git init with `.gitignore`
+- ✅ Redis and Solr wired into Drupal; other services as "container only"
 
 ### v1.1
 
-- Saved presets, with import/export as JSON or YAML
-- Done screen actions (launch, IDE, `drush uli`)
-- Drupal wiring for the remaining services
+- ✅ Saved presets, with import/export as JSON or YAML
+- ✅ Done screen actions (launch, IDE, `drush uli`)
+- ✅ Drupal wiring for the remaining services
 
 ### v1.2
 
-- Dashboard of existing sites: start, stop, delete, snapshot, `cim`/`cex`
+- ✅ Dashboard of existing sites: start, stop, delete, snapshot, `cim`/`cex`
   - Lists every project in `ddev list`, not only ones this app created.
   - Delete is `ddev delete -y`: DDEV snapshots the database first, and the
     project files stay, since the site may be the user's own work.
-- Remote update of `compat.json`
-- Auto-updater
-- Windows support via WSL2
+- ✅ Remote update of `compat.json`
+- ✅ Auto-updater
+- Windows support via WSL2 (not started)
 
-### Later
+### Later (done)
 
-- Clone an existing project from a Git repo
-- Module bundles and Drupal Recipes
-- CI templates (GitHub Actions, GitLab CI)
+- ✅ Clone an existing project from a Git repo (2.11)
+- ✅ Module bundles and Drupal Recipes (2.9)
+- ✅ CI templates (GitHub Actions, GitLab CI) (2.10)
+
+### 8.1 Publishing Updates
+
+Both updates are files under the Update URL. It must use HTTPS (plain HTTP
+works only for `localhost` and `127.0.0.1`, for testing).
+
+- **`compat.json`:** bump `revision` with every change and upload the file.
+  The app takes it only when its revision is higher than the copy it has,
+  and only if it passes the same checks as the bundled file (package, module
+  and add-on names can't be read as command options). It saves the download
+  and uses it on later launches.
+- **App updates:** `latest.json` in the Tauri updater format, next to the
+  signed bundles. The public key is in `tauri.conf.json`; the private key is
+  `~/.tauri/drupal-ddev-creator.key`. Release builds need it:
+
+  ```bash
+  TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/drupal-ddev-creator.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" pnpm tauri build
+  ```
+
+  Keep the private key out of the repository and back it up. Without it,
+  installed copies can't verify any later update.

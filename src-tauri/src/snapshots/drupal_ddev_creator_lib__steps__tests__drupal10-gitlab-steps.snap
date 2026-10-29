@@ -1,0 +1,37 @@
+---
+source: src/steps.rs
+expression: summary(&steps)
+---
+mkdir: {"kind":"createProjectDir"}
+ddev-config: {"kind":"ddev","args":["config","--project-name=mysite","--project-type=drupal10","--docroot=web","--php-version=8.2","--webserver-type=nginx-fpm","--database=mariadb:10.11"],"stdin_secret":false}
+ddev-start: {"kind":"ddev","args":["start"],"stdin_secret":false}
+create-project: {"kind":"ddev","args":["composer","create-project","drupal/recommended-project:^10","-n"],"stdin_secret":false}
+drush: {"kind":"ddev","args":["composer","require","drush/drush","-n"],"stdin_secret":false}
+allow-plugin:dealerdirect/phpcodesniffer-composer-installer: {"kind":"ddev","args":["composer","config","--no-plugins","allow-plugins.dealerdirect/phpcodesniffer-composer-installer","true"],"stdin_secret":false}
+allow-plugin:phpstan/extension-installer: {"kind":"ddev","args":["composer","config","--no-plugins","allow-plugins.phpstan/extension-installer","true"],"stdin_secret":false}
+allow-plugin:php-http/discovery: {"kind":"ddev","args":["composer","config","--no-plugins","allow-plugins.php-http/discovery","true"],"stdin_secret":false}
+allow-plugin:tbachert/spi: {"kind":"ddev","args":["composer","config","--no-plugins","allow-plugins.tbachert/spi","true"],"stdin_secret":false}
+core-dev: {"kind":"ddev","args":["composer","require","--dev","drupal/core-dev:^10","--with-all-dependencies","-n"],"stdin_secret":false}
+addon:adminer: {"kind":"ddev","args":["add-on","get","ddev/ddev-adminer"],"stdin_secret":false}
+ddev-restart: {"kind":"ddev","args":["restart"],"stdin_secret":false}
+write:phpcs.xml.dist: write phpcs.xml.dist
+write:phpstan.neon: write phpstan.neon
+write:phpunit.xml: write phpunit.xml
+write:web/modules/custom/.gitkeep: write web/modules/custom/.gitkeep
+write:web/themes/custom/.gitkeep: write web/themes/custom/.gitkeep
+script:lint: {"kind":"ddev","args":["composer","config","scripts.lint","if find web/modules/custom web/themes/custom -type f \\( -name '*.php' -o -name '*.module' -o -name '*.inc' -o -name '*.install' -o -name '*.test' -o -name '*.profile' -o -name '*.theme' -o -name '*.info' -o -name '*.yml' \\) | grep -q .; then phpcs; else echo 'No custom code to check yet.'; fi"],"stdin_secret":false}
+script:analyse: {"kind":"ddev","args":["composer","config","scripts.analyse","if find web/modules/custom web/themes/custom -type f \\( -name '*.php' -o -name '*.module' -o -name '*.inc' -o -name '*.install' -o -name '*.theme' -o -name '*.profile' \\) | grep -q .; then phpstan analyse --memory-limit=-1; else echo 'No custom code to check yet.'; fi"],"stdin_secret":false}
+script:test: {"kind":"ddev","args":["composer","config","scripts.test","phpunit"],"stdin_secret":false}
+mkdir-config-sync: {"kind":"mkdir","path":"config/sync"}
+settings-config-sync: {"kind":"setConfigSyncDir","dir":"../config/sync"}
+site-install: {"kind":"ddev","args":["drush","site:install","standard","-y","--account-name=admin","--account-mail=me@example.com","--site-name=My Site"],"stdin_secret":false}
+admin-password: {"kind":"ddev","args":["exec","read -r p && drush user:password admin \"$p\""],"stdin_secret":true}
+bundle:seo:require: {"kind":"ddev","args":["composer","require","drupal/pathauto","drupal/metatag","drupal/redirect","drupal/simple_sitemap","-n"],"stdin_secret":false}
+bundle:seo:enable: {"kind":"ddev","args":["drush","pm:enable","-y","pathauto","metatag","redirect","simple_sitemap"],"stdin_secret":false}
+write:.gitlab-ci.yml: write .gitlab-ci.yml
+config-export: {"kind":"ddev","args":["drush","config:export","-y"],"stdin_secret":false}
+htaccess: {"kind":"ddev","args":["drush","php:eval","\\Drupal::service('file.htaccess_writer')->ensure();"],"stdin_secret":false}
+write:.gitignore: write .gitignore
+git-init: {"kind":"git","args":["init","-q"]}
+git-add: {"kind":"git","args":["add","-A"]}
+git-commit: {"kind":"git","args":["commit","-q","-m","Initial Drupal site"]}

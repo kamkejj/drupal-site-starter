@@ -38,13 +38,40 @@ export type Service = {
   defaultOn: boolean;
 };
 
+export type Bundle = {
+  id: string;
+  label: string;
+  description: string;
+  packages: string[];
+  dev: boolean;
+  modules: string[];
+  releases: string[];
+};
+
+export type Recipe = {
+  id: string;
+  label: string;
+  description: string;
+  package: string;
+  releases: string[];
+};
+
+/** Empty `releases` means every release. */
+export const availableFor = (item: { releases: string[] }, release: string) =>
+  item.releases.length === 0 || item.releases.includes(release);
+
 export type Compat = {
+  revision: number;
   minDdevVersion: string;
   minDdevVersionPodman: string;
   composerPlugins: string[];
   drupal: DrupalRelease[];
   services: Service[];
+  bundles: Bundle[];
+  recipes: Recipe[];
 };
+
+export type Ci = "none" | "github" | "gitlab";
 
 export type ProjectInput = {
   name: string;
@@ -54,6 +81,9 @@ export type ProjectInput = {
   webserver: Webserver;
   database: Database;
   services: string[];
+  bundles: string[];
+  recipes: string[];
+  ci: Ci;
   adminName: string;
   adminEmail: string;
   siteName: string;
@@ -62,7 +92,22 @@ export type ProjectInput = {
   initGit: boolean;
 };
 
-export type FieldError = { field: keyof ProjectInput; message: string };
+export type DbSource = { kind: "existingConfig" } | { kind: "dump"; path: string } | { kind: "none" };
+
+export type CloneInput = {
+  repoUrl: string;
+  parentDir: string;
+  name: string;
+  drupal: string;
+  database: DbSource;
+  adminName: string;
+  adminEmail: string;
+};
+
+/** A run the Run screen drives. */
+export type Job = { kind: "create"; input: ProjectInput } | { kind: "clone"; input: CloneInput };
+
+export type FieldError = { field: keyof ProjectInput | keyof CloneInput; message: string };
 
 export type Retry =
   | { kind: "rerun" }
@@ -71,7 +116,14 @@ export type Retry =
 
 export type Step = { id: string; title: string; timeoutSecs: number; retry: Retry };
 
-export type Plan = { steps: Step[]; script: string; dir: string; folderWarning: string | null };
+export type Plan = {
+  name: string;
+  steps: Step[];
+  script: string | null;
+  dir: string;
+  folderWarning: string | null;
+  needsPassword: boolean;
+};
 
 export type AppSettings = {
   adminName: string;
@@ -80,12 +132,26 @@ export type AppSettings = {
   services: string[];
   configSyncDir: string;
   ide: string;
+  updateUrl: string;
 };
 
 export type Preset = Pick<
   ProjectInput,
-  "drupal" | "php" | "webserver" | "database" | "services" | "configSyncDir" | "exportConfigOnInstall" | "initGit"
+  | "drupal"
+  | "php"
+  | "webserver"
+  | "database"
+  | "services"
+  | "bundles"
+  | "recipes"
+  | "ci"
+  | "configSyncDir"
+  | "exportConfigOnInstall"
+  | "initGit"
 > & { name: string };
+
+export type CompatUpdate = { revision: number; updated: boolean };
+export type AppUpdate = { version: string; currentVersion: string; notes: string | null };
 
 export type CheckResult = {
   id: string;
@@ -127,28 +193,27 @@ export const api = {
   listSites: () => invoke<Site[]>("list_sites"),
   siteAction: (name: string, action: SiteAction) => invoke<void>("site_action", { name, action }),
   projectUrl: (name: string) => invoke<string>("project_url", { name }),
-  plan: (input: ProjectInput) => invoke<Plan>("plan_project", { input }),
+  plan: (job: Job) => invoke<Plan>("plan_project", { job }),
   exportScript: (input: ProjectInput, path: string) =>
     invoke<void>("export_script", { input, path }),
-  startRun: (
-    input: ProjectInput,
-    password: string | null,
-    resume: boolean,
-    onEvent: (e: RunEvent) => void,
-  ) => {
+  startRun: (job: Job, password: string | null, resume: boolean, onEvent: (e: RunEvent) => void) => {
     const channel = new Channel<RunEvent>();
     channel.onmessage = onEvent;
-    return invoke<string>("start_run", { input, password, resume, onEvent: channel });
+    return invoke<string>("start_run", { job, password, resume, onEvent: channel });
   },
   cancelRun: () => invoke<void>("cancel_run"),
-  deleteProject: (input: ProjectInput) => invoke<void>("delete_project", { input }),
+  deleteProject: (job: Job) => invoke<void>("delete_project", { job }),
   listPresets: () => invoke<Preset[]>("list_presets"),
   savePreset: (preset: Preset) => invoke<Preset[]>("save_preset", { preset }),
   deletePreset: (name: string) => invoke<Preset[]>("delete_preset", { name }),
   importPresets: (path: string) => invoke<Preset[]>("import_presets", { path }),
   exportPresets: (path: string) => invoke<void>("export_presets", { path }),
-  openInIde: (input: ProjectInput) => invoke<void>("open_in_ide", { input }),
-  loginLink: (input: ProjectInput) => invoke<string>("login_link", { input }),
+  openInIde: (job: Job) => invoke<void>("open_in_ide", { job }),
+  loginLink: (job: Job) => invoke<string>("login_link", { job }),
+  suggestedCloneName: (url: string) => invoke<string>("suggested_clone_name", { url }),
+  checkCompatUpdate: () => invoke<CompatUpdate>("check_compat_update"),
+  checkAppUpdate: () => invoke<AppUpdate | null>("check_app_update"),
+  installAppUpdate: () => invoke<void>("install_app_update"),
 };
 
 /** `plan_project` rejects with a FieldError list; other commands with a string. */

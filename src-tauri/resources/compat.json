@@ -1,4 +1,5 @@
 {
+  "revision": 1,
   "minDdevVersion": "1.24.0",
   "minDdevVersionPodman": "1.25.0",
   "composerPlugins": [
@@ -150,5 +151,62 @@
       "defaultOn": false
     },
     { "id": "selenium", "label": "Selenium", "addon": "ddev/ddev-selenium-standalone-chrome", "wiring": { "kind": "none" }, "defaultOn": false }
+  ],
+  "bundles": [
+    {
+      "id": "admin",
+      "label": "Admin essentials",
+      "description": "Admin Toolbar with its extra menus.",
+      "packages": ["drupal/admin_toolbar"],
+      "modules": ["admin_toolbar", "admin_toolbar_tools"],
+      "releases": ["11", "cms", "10"]
+    },
+    {
+      "id": "seo",
+      "label": "SEO basics",
+      "description": "Pathauto, Metatag, Redirect and Simple XML Sitemap.",
+      "packages": ["drupal/pathauto", "drupal/metatag", "drupal/redirect", "drupal/simple_sitemap"],
+      "modules": ["pathauto", "metatag", "redirect", "simple_sitemap"],
+      "releases": ["11", "cms", "10"]
+    },
+    {
+      "id": "dev",
+      "label": "Developer tools",
+      "description": "Devel and Stage File Proxy, added as dev dependencies.",
+      "packages": ["drupal/devel", "drupal/stage_file_proxy"],
+      "dev": true,
+      "modules": ["devel", "stage_file_proxy"],
+      "releases": ["11", "cms", "10"]
+    }
+  ],
+  "recipes": [
+    {
+      "id": "seo-tools",
+      "label": "SEO tools",
+      "description": "Meta tags, an XML sitemap, robots.txt management and an SEO checklist.",
+      "package": "drupal/drupal_cms_seo_tools",
+      "releases": ["11", "cms"]
+    },
+    {
+      "id": "accessibility-tools",
+      "label": "Accessibility tools",
+      "description": "Editoria11y checks that flag accessibility problems while editors write.",
+      "package": "drupal/drupal_cms_accessibility_tools",
+      "releases": ["11", "cms"]
+    },
+    {
+      "id": "privacy-basic",
+      "label": "Privacy basics",
+      "description": "Klaro consent management and blocking of remote content until consent.",
+      "package": "drupal/drupal_cms_privacy_basic",
+      "releases": ["11", "cms"]
+    },
+    {
+      "id": "forms",
+      "label": "Forms",
+      "description": "A contact form plus Webform, with Honeypot and ALTCHA spam protection.",
+      "package": "drupal/drupal_cms_forms",
+      "releases": ["11", "cms"]
+    }
   ]
 }
