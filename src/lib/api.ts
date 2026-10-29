@@ -83,6 +83,8 @@ export type ProjectInput = {
   services: string[];
   bundles: string[];
   recipes: string[];
+  /** Drupal.org project names, each optionally followed by `:constraint`. */
+  extraModules: string[];
   ci: Ci;
   adminName: string;
   adminEmail: string;
@@ -145,6 +147,7 @@ export type Preset = Pick<
   | "services"
   | "bundles"
   | "recipes"
+  | "extraModules"
   | "ci"
   | "configSyncDir"
   | "exportConfigOnInstall"

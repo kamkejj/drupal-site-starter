@@ -155,8 +155,12 @@ impl Recipe {
 fn is_package(s: &str) -> bool {
     let (name, constraint) = s.split_once(':').unwrap_or((s, ""));
     let part = |p: &str| !p.is_empty() && !p.starts_with(['-', '.']) && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "_.-".contains(c));
-    let constraint_ok = constraint.chars().all(|c| c.is_ascii_alphanumeric() || "^~*.@|<>=, -".contains(c));
-    matches!(name.split_once('/'), Some((v, n)) if part(v) && part(n)) && constraint_ok
+    matches!(name.split_once('/'), Some((v, n)) if part(v) && part(n)) && is_constraint(constraint)
+}
+
+/// A Composer version constraint such as `^2.1 || ^3`, or empty for any version.
+pub(crate) fn is_constraint(s: &str) -> bool {
+    s.chars().all(|c| c.is_ascii_alphanumeric() || "^~*.@|<>=, -".contains(c))
 }
 
 fn is_machine_word(s: &str) -> bool {

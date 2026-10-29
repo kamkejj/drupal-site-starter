@@ -46,6 +46,9 @@ pub struct ProjectInput {
     pub bundles: Vec<String>,
     #[serde(default)]
     pub recipes: Vec<String>,
+    /// Drupal.org projects to add and enable, as `name` or `name:constraint`.
+    #[serde(default)]
+    pub extra_modules: Vec<String>,
     #[serde(default)]
     pub ci: Ci,
     pub admin_name: String,
@@ -70,6 +73,7 @@ pub struct Project {
     pub services: Vec<Service>,
     pub bundles: Vec<Bundle>,
     pub recipes: Vec<Recipe>,
+    pub extra_modules: Vec<ExtraModule>,
     pub ci: Ci,
     pub admin_name: String,
     pub admin_email: String,
@@ -86,6 +90,37 @@ impl Project {
         normalize(&Path::new(DOCROOT).join(&self.config_sync_dir))
             .expect("validated in parse")
     }
+}
+
+/// A Drupal.org project the user named, added with Composer and enabled as
+/// the module of the same name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtraModule {
+    pub name: String,
+    pub constraint: Option<String>,
+}
+
+impl ExtraModule {
+    pub fn package(&self) -> String {
+        match &self.constraint {
+            Some(c) => format!("drupal/{}:{c}", self.name),
+            None => format!("drupal/{}", self.name),
+        }
+    }
+}
+
+/// Parses `name` or `name:constraint`. The name follows Drupal's rules for
+/// module machine names, so it can't be read as a command option.
+fn extra_module(entry: &str) -> Option<ExtraModule> {
+    let (name, constraint) = match entry.trim().split_once(':') {
+        Some((n, c)) => (n.trim(), Some(c.trim())),
+        None => (entry.trim(), None),
+    };
+    let name_ok = name.len() <= 64
+        && name.starts_with(|c: char| c.is_ascii_lowercase())
+        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+    let constraint_ok = constraint.is_none_or(|c| !c.is_empty() && crate::compat::is_constraint(c));
+    (name_ok && constraint_ok).then(|| ExtraModule { name: name.into(), constraint: constraint.map(String::from) })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -222,6 +257,20 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
         }
     }
 
+    let mut extra_modules: Vec<ExtraModule> = Vec::new();
+    for entry in &input.extra_modules {
+        match extra_module(entry) {
+            Some(m) if extra_modules.iter().any(|x| x.name == m.name) => {
+                err("extraModules", &format!("{} is listed more than once.", m.name))
+            }
+            Some(m) => extra_modules.push(m),
+            None => err(
+                "extraModules",
+                &format!("\"{}\" isn't a module name. Use names like token or webform:^6.2.", entry.trim()),
+            ),
+        }
+    }
+
     if !is_admin_name(&input.admin_name) {
         err("adminName", ADMIN_NAME_RULE);
     }
@@ -262,6 +311,7 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
             services,
             bundles,
             recipes,
+            extra_modules,
             ci: input.ci,
             admin_name: input.admin_name.clone(),
             admin_email: input.admin_email.clone(),
@@ -291,6 +341,7 @@ pub(crate) mod tests {
             services: vec!["mailpit".into(), "adminer".into()],
             bundles: vec![],
             recipes: vec![],
+            extra_modules: vec![],
             ci: Ci::None,
             admin_name: "admin".into(),
             admin_email: "me@example.com".into(),
@@ -385,6 +436,22 @@ pub(crate) mod tests {
         i.bundles = vec!["nope".into()];
         i.recipes = vec![];
         assert_eq!(fields(parse(&i, &Compat::bundled())), vec!["bundles"]);
+    }
+
+    #[test]
+    fn extra_modules_take_a_name_and_an_optional_constraint() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut i = input(tmp.path());
+        i.extra_modules = vec!["token".into(), " webform : ^6.2 || ^7 ".into()];
+        let packages: Vec<String> = parse(&i, &Compat::bundled()).unwrap().extra_modules.iter().map(ExtraModule::package).collect();
+        assert_eq!(packages, ["drupal/token", "drupal/webform:^6.2 || ^7"]);
+
+        for bad in ["-token", "Token", "drupal/token", "token:", "token:$(rm)", "2fa", "token; rm"] {
+            i.extra_modules = vec![bad.into()];
+            assert_eq!(fields(parse(&i, &Compat::bundled())), ["extraModules"], "{bad}");
+        }
+        i.extra_modules = vec!["token".into(), "token:^1".into()];
+        assert_eq!(fields(parse(&i, &Compat::bundled())), ["extraModules"], "duplicates");
     }
 
     #[test]

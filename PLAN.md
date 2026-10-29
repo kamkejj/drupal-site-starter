@@ -159,6 +159,12 @@ Both live in `compat.json` and are filtered by the Drupal choice.
   essentials (Admin Toolbar), SEO basics (Pathauto, Metatag, Redirect, Simple
   XML Sitemap) and Developer tools (Devel, Stage File Proxy, as dev
   dependencies). Not offered for the Drupal 12 preview yet.
+- **Extra modules** are any other Drupal.org projects, typed as a
+  comma-separated list such as `token, webform:^6.2`. Each name must be a
+  module machine name; the optional `:constraint` is a Composer version
+  constraint. The app adds them as `drupal/<name>` in one `composer require`
+  after the bundles, then enables the module of the same name. Presets save
+  the list.
 - **Recipes** are Drupal CMS recipes from Packagist (SEO tools,
   Accessibility tools, Privacy basics, Forms), for Drupal 11 and Drupal CMS.
   The app requires them in one `composer require`, applies each with

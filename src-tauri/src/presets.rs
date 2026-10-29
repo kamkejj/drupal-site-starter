@@ -20,6 +20,8 @@ pub struct Preset {
     #[serde(default)]
     pub recipes: Vec<String>,
     #[serde(default)]
+    pub extra_modules: Vec<String>,
+    #[serde(default)]
     pub ci: Ci,
     pub config_sync_dir: String,
     pub export_config_on_install: bool,
@@ -111,6 +113,7 @@ mod tests {
             services: vec!["redis".into(), "solr".into()],
             bundles: vec!["seo".into()],
             recipes: vec![],
+            extra_modules: vec!["token".into()],
             ci: Ci::Gitlab,
             config_sync_dir: "../config/sync".into(),
             export_config_on_install: true,
@@ -167,6 +170,6 @@ mod tests {
         let path = tmp.path().join("old.json");
         std::fs::write(&path, r#"[{"name":"Old","drupal":"11","php":"8.3","webserver":"nginx-fpm","database":{"type":"mariadb","version":"10.11"},"services":[],"configSyncDir":"../config/sync","exportConfigOnInstall":true,"initGit":true}]"#).unwrap();
         let p = &read(&path).unwrap()[0];
-        assert!(p.bundles.is_empty() && p.recipes.is_empty() && p.ci == Ci::None);
+        assert!(p.bundles.is_empty() && p.recipes.is_empty() && p.extra_modules.is_empty() && p.ci == Ci::None);
     }
 }

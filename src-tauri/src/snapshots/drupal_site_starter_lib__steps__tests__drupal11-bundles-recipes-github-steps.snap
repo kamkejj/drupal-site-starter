@@ -30,6 +30,8 @@ bundle:admin:require: {"kind":"ddev","args":["composer","require","drupal/admin_
 bundle:admin:enable: {"kind":"ddev","args":["drush","pm:enable","-y","admin_toolbar","admin_toolbar_tools"],"stdin_secret":false}
 bundle:dev:require: {"kind":"ddev","args":["composer","require","--dev","drupal/devel","drupal/stage_file_proxy","-n"],"stdin_secret":false}
 bundle:dev:enable: {"kind":"ddev","args":["drush","pm:enable","-y","devel","stage_file_proxy"],"stdin_secret":false}
+extra:require: {"kind":"ddev","args":["composer","require","drupal/token","drupal/webform:^6.2 || ^7","-n"],"stdin_secret":false}
+extra:enable: {"kind":"ddev","args":["drush","pm:enable","-y","token","webform"],"stdin_secret":false}
 recipes:require: {"kind":"ddev","args":["composer","require","drupal/drupal_cms_seo_tools","drupal/drupal_cms_forms","-n"],"stdin_secret":false}
 recipe:seo-tools: {"kind":"ddev","args":["drush","recipe","../recipes/drupal_cms_seo_tools","-y"],"stdin_secret":false}
 recipe:forms: {"kind":"ddev","args":["drush","recipe","../recipes/drupal_cms_forms","-y"],"stdin_secret":false}
