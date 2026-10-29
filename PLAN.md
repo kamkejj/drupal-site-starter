@@ -24,7 +24,8 @@ DDEV, based on a set of user-selected options.
 ### 2.1 Global Settings (saved once, reused)
 
 - **Default user 1 credentials:** username, email and password.
-  - The password is stored in the OS keychain, never in plain text.
+  - The password is saved in a file in the app data folder that only the
+    current user can read. OS keychain storage is deferred.
   - Each project can override these.
 - **Default projects folder,** such as `~/Projects`.
 - **Container runtime:** detected, not chosen per project (see 2.5).
@@ -298,8 +299,6 @@ over** (`ddev delete -Oy` plus removing the folder, after confirmation).
   Runs on macOS and Linux; Windows is planned (see 5.1).
 - **Running shell commands:** the Rust backend starts `ddev` and streams its
   output to the UI line by line.
-- **Keychain support:** the `keyring` crate uses macOS Keychain, Windows
-  Credential Manager or the Linux Secret Service.
 - **Security:** the frontend can only call a small set of typed Tauri
   commands. Rust validates every input and spawns only `ddev` (and `git`)
   with argument arrays. Running processes through `tokio::process` skips
@@ -315,7 +314,7 @@ over** (`ddev delete -Oy` plus removing the folder, after confirmation).
 | State                 | Svelte stores                                            |
 | Process runner        | Rust `tokio::process` and Tauri events for log streaming |
 | PATH fix              | `fix-path-env` crate (or login-shell lookup)             |
-| Secrets               | `keyring` crate                                          |
+| Secrets               | User-only file in the app data folder                    |
 | Settings and presets  | `tauri-plugin-store` (JSON)                              |
 | Folder picker         | `tauri-plugin-dialog`                                    |
 | Compatibility data    | Bundled `compat.json`, with an optional remote update    |
@@ -352,7 +351,7 @@ Rust backend
   ├─ preflight: ddev version, runtime, mkcert, ports, disk
   ├─ pipeline: ordered steps → spawn → emit("log", line) / emit("step", status)
   │    └─ run state file, cancel, resume, delete-and-restart
-  ├─ secrets: keyring get/set, log redaction
+  ├─ secrets: saved password file, log redaction
   ├─ templates: phpcs/phpstan/phpunit, settings.php edits, .gitignore
   └─ script export: render the same steps to a .sh file (no secrets)
 ```
@@ -423,7 +422,7 @@ type ProjectConfig = {
 ### MVP (macOS and Linux)
 
 - ✅ Preflight checks, PATH fix and non-interactive runs
-- ✅ Global settings, with secrets in the keychain
+- ✅ Global settings, with the admin password saved in the app data folder
 - ✅ Wizard with filtering based on `compat.json`
 - ✅ Pipeline runner with a live log, saved logs, cancel, retry and resume
 - ✅ "Export as script" (reuses the same steps)

@@ -124,7 +124,7 @@
     <PasswordInput
       id="settings-admin-password"
       bind:value={password}
-      placeholder={hasPassword ? "Saved in the keychain. Type to replace it." : "Stored in the OS keychain"}
+      placeholder={hasPassword ? "Saved. Type to replace it." : "Saved in the app data folder"}
     />
   </div>
 

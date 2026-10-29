@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-const KEYCHAIN_SERVICE: &str = "dev.spinup.drupal";
-const KEYCHAIN_USER: &str = "default-admin";
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppSettings {
@@ -48,14 +45,38 @@ impl AppSettings {
     }
 }
 
-fn entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER).map_err(|e| e.to_string())
+pub fn set_admin_password(file: &Path, password: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    options.open(file)?.write_all(password.as_bytes())
 }
 
-pub fn set_admin_password(password: &str) -> Result<(), String> {
-    entry()?.set_password(password).map_err(|e| e.to_string())
+pub fn admin_password(file: &Path) -> Option<String> {
+    std::fs::read_to_string(file).ok().filter(|p| !p.is_empty())
 }
 
-pub fn admin_password() -> Option<String> {
-    entry().ok()?.get_password().ok()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn admin_password_round_trips_and_stays_private() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("nested/admin-password");
+        assert_eq!(admin_password(&file), None);
+        set_admin_password(&file, "first").unwrap();
+        set_admin_password(&file, "second").unwrap();
+        assert_eq!(admin_password(&file).as_deref(), Some("second"));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
+        }
+    }
 }

@@ -50,6 +50,10 @@ fn settings_file(app: &AppHandle) -> Result<PathBuf, String> {
     data_file(app, &["settings.json"])
 }
 
+fn password_file(app: &AppHandle) -> Result<PathBuf, String> {
+    data_file(app, &["admin-password"])
+}
+
 fn presets_file(app: &AppHandle) -> Result<PathBuf, String> {
     data_file(app, &["presets.json"])
 }
@@ -166,7 +170,7 @@ struct LoadedSettings {
 fn load_settings(app: AppHandle) -> Result<LoadedSettings, String> {
     Ok(LoadedSettings {
         settings: AppSettings::load(&settings_file(&app)?),
-        has_password: settings::admin_password().is_some(),
+        has_password: settings::admin_password(&password_file(&app)?).is_some(),
     })
 }
 
@@ -174,7 +178,7 @@ fn load_settings(app: AppHandle) -> Result<LoadedSettings, String> {
 fn save_settings(app: AppHandle, settings: AppSettings, password: Option<String>) -> Result<(), String> {
     settings.save(&settings_file(&app)?).map_err(|e| e.to_string())?;
     match password.filter(|p| !p.is_empty()) {
-        Some(p) => settings::set_admin_password(&p),
+        Some(p) => settings::set_admin_password(&password_file(&app)?, &p).map_err(|e| e.to_string()),
         None => Ok(()),
     }
 }
@@ -302,7 +306,8 @@ async fn start_run(
     on_event: Channel<RunEvent>,
 ) -> Result<String, String> {
     let p = resolve_err(&state, &job, resume)?;
-    let password = match password.filter(|p| !p.is_empty()).or_else(settings::admin_password) {
+    let saved = password_file(&app)?;
+    let password = match password.filter(|p| !p.is_empty()).or_else(|| settings::admin_password(&saved)) {
         Some(pw) => pw,
         None if !p.needs_password => String::new(),
         None => return Err("Set an admin password in Settings or for this project.".into()),
