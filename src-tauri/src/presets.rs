@@ -57,16 +57,34 @@ pub fn merge(into: &mut Vec<Preset>, incoming: Vec<Preset>) {
 /// against compat.json later, when the wizard plans a project from them.
 pub fn read(path: &Path) -> Result<Vec<Preset>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let presets: Vec<Preset> = if is_yaml(path) {
-        serde_saphyr::from_str(&text).map_err(|e| e.to_string())?
+    let (presets, raw): (Vec<Preset>, Vec<serde_json::Value>) = if is_yaml(path) {
+        (serde_saphyr::from_str(&text).map_err(|e| e.to_string())?, serde_saphyr::from_str(&text).map_err(|e| e.to_string())?)
     } else {
-        serde_json::from_str(&text).map_err(|e| e.to_string())?
+        (serde_json::from_str(&text).map_err(|e| e.to_string())?, serde_json::from_str(&text).map_err(|e| e.to_string())?)
     };
     let presets: Vec<Preset> = presets.into_iter().map(|p| Preset { name: p.name.trim().to_string(), ..p }).collect();
     if presets.iter().any(|p| p.name.is_empty()) {
         return Err("Every preset needs a name.".into());
     }
+    for (p, raw) in presets.iter().zip(&raw) {
+        let known = serde_json::to_value(p).expect("serializable");
+        if let Some(field) = unknown_field(raw, &known, "") {
+            return Err(format!("Preset \"{}\" has an unknown field \"{field}\".", p.name));
+        }
+    }
     Ok(presets)
+}
+
+/// The first key in `raw` that a saved preset doesn't have, such as a
+/// misspelling that serde would otherwise skip. Nested keys come back as
+/// `database.typ`. Unknown keys aren't rejected when loading presets.json,
+/// so a file written by a newer version still loads.
+fn unknown_field(raw: &serde_json::Value, known: &serde_json::Value, prefix: &str) -> Option<String> {
+    let (raw, known) = (raw.as_object()?, known.as_object()?);
+    raw.iter().find_map(|(key, value)| match known.get(key) {
+        None => Some(format!("{prefix}{key}")),
+        Some(k) => unknown_field(value, k, &format!("{prefix}{key}.")),
+    })
 }
 
 pub fn write(path: &Path, presets: &[Preset]) -> Result<(), String> {
@@ -129,6 +147,18 @@ mod tests {
         assert!(read(&path).is_err(), "blank name");
         std::fs::write(&path, r#"[{"name": "x"}]"#).unwrap();
         assert!(read(&path).is_err(), "missing fields");
+    }
+
+    #[test]
+    fn import_rejects_misspelled_fields() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("p.yaml");
+        write(&path, &[preset("Agency", "8.3")]).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, text.replace("bundles:", "bundle:")).unwrap();
+        assert_eq!(read(&path).unwrap_err(), r#"Preset "Agency" has an unknown field "bundle"."#);
+        std::fs::write(&path, text.replace("version:", "versoin:").replace("type: postgres", "type: postgres\n    version: '17'")).unwrap();
+        assert_eq!(read(&path).unwrap_err(), r#"Preset "Agency" has an unknown field "database.versoin"."#);
     }
 
     #[test]

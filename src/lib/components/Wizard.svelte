@@ -96,14 +96,21 @@
     input.php = phpOk ? p.php : r.defaultPhp;
     input.database = dbOk ? { ...p.database } : { ...r.defaultDatabase };
     input.webserver = p.webserver;
-    input.services = p.services.filter((id) => compat.services.some((s) => s.id === id));
-    input.bundles = (p.bundles ?? []).filter((id) => compat.bundles.some((b) => b.id === id && availableFor(b, r.id)));
-    input.recipes = (p.recipes ?? []).filter((id) => compat.recipes.some((x) => x.id === id && availableFor(x, r.id)));
+    const dropped: string[] = [];
+    /** Keeps the ids `ok` accepts and names the rest in `dropped`. */
+    const keep = (ids: string[], all: { id: string; label: string }[], ok: (id: string) => boolean) =>
+      ids.filter((id) => ok(id) || void dropped.push(all.find((x) => x.id === id)?.label ?? id));
+    input.services = keep(p.services, compat.services, (id) => compat.services.some((s) => s.id === id));
+    input.bundles = keep(p.bundles ?? [], compat.bundles, (id) => compat.bundles.some((b) => b.id === id && availableFor(b, r.id)));
+    input.recipes = keep(p.recipes ?? [], compat.recipes, (id) => compat.recipes.some((x) => x.id === id && availableFor(x, r.id)));
     input.ci = p.ci ?? "none";
     input.configSyncDir = p.configSyncDir;
     input.exportConfigOnInstall = p.exportConfigOnInstall;
     input.initGit = p.initGit;
-    if (!phpOk || !dbOk) presetNote = `${r.label} no longer supports some of this preset's versions, so the defaults are used instead.`;
+    const notes: string[] = [];
+    if (!phpOk || !dbOk) notes.push(`${r.label} no longer supports some of this preset's versions, so the defaults are used instead.`);
+    if (dropped.length) notes.push(`Left out because they aren't available for ${r.label}: ${dropped.join(", ")}.`);
+    presetNote = notes.join(" ");
   }
 
   async function savePreset() {

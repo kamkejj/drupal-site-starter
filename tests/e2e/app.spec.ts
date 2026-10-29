@@ -39,6 +39,27 @@ test("Drupal 10 offers bundles but drops recipes", async ({ page }) => {
   await expect(page.getByText("Recipes need Drupal 11 or Drupal CMS.")).toBeVisible();
 });
 
+test("a preset names the services, bundles and recipes it can't use", async ({ page }) => {
+  const preset = {
+    name: "Old agency",
+    drupal: "10",
+    php: "8.3",
+    webserver: "nginx-fpm",
+    database: { type: "mariadb", version: "10.11" },
+    services: ["redis", "couchdb"],
+    bundles: [],
+    recipes: ["privacy-basic"],
+    ci: "none",
+    configSyncDir: "../config/sync",
+    exportConfigOnInstall: true,
+    initGit: true,
+  };
+  await open(page, { presets: [preset] });
+  await page.getByLabel("Start from preset").selectOption("Old agency");
+
+  await expect(page.getByText("Left out because they aren't available for Drupal 10: couchdb, Privacy basics.")).toBeVisible();
+});
+
 test("clones a repo, showing field errors from the backend first", async ({ page }) => {
   await open(page);
   await page.getByRole("button", { name: "Clone from Git" }).click();
