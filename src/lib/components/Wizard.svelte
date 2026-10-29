@@ -32,7 +32,7 @@
   const FIELD_STEP: Record<keyof ProjectInput, number> = {
     name: 0, parentDir: 0, siteName: 0, adminName: 0, adminEmail: 0,
     drupal: 1, php: 1,
-    webserver: 2, database: 2, configSyncDir: 2,
+    webserver: 2, httpsPort: 2, database: 2, configSyncDir: 2,
     services: 3, bundles: 3, recipes: 3, ci: 3, exportConfigOnInstall: 3, initGit: 3,
   };
   const CI_OPTIONS: [Ci, string][] = [["none", "None"], ["github", "GitHub Actions"], ["gitlab", "GitLab CI"]];
@@ -69,6 +69,7 @@
     configSyncDir: seed.defaults.configSyncDir,
     exportConfigOnInstall: true,
     initGit: true,
+    httpsPort: null,
   });
 
   let presets = $state<Preset[]>([]);
@@ -128,6 +129,16 @@
   const nameTaken = $derived(taken.includes(input.name));
 
   api.existingProjects().then((names) => (taken = names));
+
+  let portUser = $state<string | null>(null);
+  $effect(() => {
+    const port = input.httpsPort;
+    portUser = null;
+    if (port == null || !Number.isInteger(port) || port < 1024 || port > 65535) return;
+    api.portUser(port).then((user) => {
+      if (input.httpsPort === port) portUser = user;
+    });
+  });
 
   $effect(() => {
     const display = displayName;
@@ -190,7 +201,7 @@
     notice = `Saved ${path}`;
   }
 
-  const canCreate = $derived(plan !== null && !nameTaken && (hasPassword || password.length > 0));
+  const canCreate = $derived(plan !== null && !nameTaken && !portUser && (hasPassword || password.length > 0));
 </script>
 
 <section class="mx-auto max-w-3xl">
@@ -297,6 +308,15 @@
           {/each}
         </div>
       </div>
+      <label class="field">
+        <span>HTTPS port (optional)</span>
+        <input class="input" type="number" min="1024" max="65535" step="1" placeholder="Use the shared router port" bind:value={input.httpsPort} />
+        <small class="text-slate-500">
+          Use a port from 30000 to 30500. The site opens at https://{input.name || "NAME"}.ddev.site:{input.httpsPort ?? "PORT"}.
+        </small>
+        {#if portUser}<small class="error">Port {input.httpsPort} is already used by {portUser}.</small>{/if}
+        {#if errorFor("httpsPort")}<small class="error">{errorFor("httpsPort")}</small>{/if}
+      </label>
       <div class="grid grid-cols-2 gap-4">
         <label class="field">
           <span>Database</span>
@@ -409,6 +429,9 @@
       <dl class="grid grid-cols-[10rem_1fr] gap-y-1 text-sm">
         <dt class="text-slate-500">Folder</dt><dd class="font-mono">{plan.dir}</dd>
         <dt class="text-slate-500">Hostname</dt><dd class="font-mono">{input.name}.ddev.site</dd>
+        {#if input.httpsPort != null}
+          <dt class="text-slate-500">URL</dt><dd class="font-mono">https://{input.name}.ddev.site:{input.httpsPort}</dd>
+        {/if}
         <dt class="text-slate-500">Drupal</dt><dd>{release.label}, PHP {input.php}</dd>
         <dt class="text-slate-500">Stack</dt><dd>{input.webserver}, {DB_LABEL[input.database.type]} {input.database.version}</dd>
         {#if input.bundles.length || input.recipes.length}
@@ -427,6 +450,7 @@
       </dl>
       {#if plan.folderWarning}<p class="text-sm text-amber-700">{plan.folderWarning}</p>{/if}
       {#if nameTaken}<p class="error">A DDEV project named {input.name} already exists.</p>{/if}
+      {#if portUser}<p class="error">Port {input.httpsPort} is already used by {portUser}.</p>{/if}
       {#if !hasPassword && !password}<p class="error">Enter an admin password on the Project step.</p>{/if}
       <div class="flex gap-2">
         <button class="btn-ghost" onclick={() => (showScript = !showScript)}>

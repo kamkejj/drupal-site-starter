@@ -45,6 +45,34 @@ pub fn parse_list(json: &str) -> Vec<Site> {
         .collect()
 }
 
+/// Router ports a project pins in `.ddev/config.yaml`. Unpinned projects share
+/// the global router ports, which only show up as bound while the router runs.
+pub fn pinned_ports(config_yaml: &str) -> Vec<u16> {
+    config_yaml
+        .lines()
+        .filter_map(|l| {
+            let (key, value) = l.split_once(':')?;
+            if !matches!(key.trim(), "router_http_port" | "router_https_port") {
+                return None;
+            }
+            value.trim().trim_matches(['"', '\'']).parse().ok()
+        })
+        .collect()
+}
+
+/// Who already holds `port`: a DDEV project that pins it as a router port, or
+/// any program listening on it, including the router on its fallback ports.
+pub fn port_user(sites: &[Site], port: u16) -> Option<String> {
+    sites
+        .iter()
+        .find(|s| {
+            let config = std::fs::read_to_string(s.dir.join(".ddev/config.yaml")).unwrap_or_default();
+            pinned_ports(&config).contains(&port)
+        })
+        .map(|s| format!("the DDEV project {}", s.name))
+        .or_else(|| (!crate::preflight::port_free(port)).then(|| "another program, such as the DDEV router".to_string()))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SiteAction {
@@ -126,6 +154,13 @@ mod tests {
     fn actions_map_to_ddev_args() {
         assert_eq!(SiteAction::Start.args("blog"), ["start", "blog"]);
         assert_eq!(SiteAction::Delete.args("blog"), ["delete", "-y", "blog"]);
+    }
+
+    #[test]
+    fn reads_pinned_ports_from_ddev_config() {
+        let yaml = "name: blog\nrouter_http_port: \"30300\"\nrouter_https_port: 30301\nhost_webserver_port: \"30302\"\n";
+        assert_eq!(pinned_ports(yaml), [30300, 30301]);
+        assert!(pinned_ports("name: blog\nrouter_https_port: \"\"\n").is_empty());
         assert_eq!(SiteAction::ConfigExport.args("blog"), ["drush", "config:export", "-y"]);
         assert!(!SiteAction::Start.needs_running());
         assert!(SiteAction::ConfigImport.needs_running());

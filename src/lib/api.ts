@@ -90,6 +90,7 @@ export type ProjectInput = {
   configSyncDir: string;
   exportConfigOnInstall: boolean;
   initGit: boolean;
+  httpsPort: number | null;
 };
 
 export type DbSource = { kind: "existingConfig" } | { kind: "dump"; path: string } | { kind: "none" };
@@ -190,6 +191,7 @@ export const api = {
     invoke<void>("save_settings", { settings, password }),
   preflight: (projectsDir: string) => invoke<CheckResult[]>("preflight", { projectsDir }),
   existingProjects: () => invoke<string[]>("existing_projects"),
+  portUser: (port: number) => invoke<string | null>("port_user", { port }),
   listSites: () => invoke<Site[]>("list_sites"),
   siteAction: (name: string, action: SiteAction) => invoke<void>("site_action", { name, action }),
   projectUrl: (name: string) => invoke<string>("project_url", { name }),

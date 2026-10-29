@@ -3,7 +3,7 @@ source: src/steps.rs
 expression: summary(&steps)
 ---
 mkdir: {"kind":"createProjectDir"}
-ddev-config: {"kind":"ddev","args":["config","--project-name=mysite","--project-type=drupal10","--docroot=web","--php-version=8.2","--webserver-type=nginx-fpm","--database=mariadb:10.11"],"stdin_secret":false}
+ddev-config: {"kind":"ddev","args":["config","--project-name=mysite","--project-type=drupal10","--docroot=web","--php-version=8.2","--webserver-type=nginx-fpm","--database=mariadb:10.11","--router-https-port=30001"],"stdin_secret":false}
 ddev-start: {"kind":"ddev","args":["start"],"stdin_secret":false}
 create-project: {"kind":"ddev","args":["composer","create-project","drupal/recommended-project:^10","-n"],"stdin_secret":false}
 drush: {"kind":"ddev","args":["composer","require","drush/drush","-n"],"stdin_secret":false}

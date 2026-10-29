@@ -18,7 +18,7 @@ mkdir -p mysite
 cd mysite
 
 # Configure DDEV
-ddev config --project-name=mysite --project-type=drupal10 --docroot=web --php-version=8.2 --webserver-type=nginx-fpm --database=mariadb:10.11
+ddev config --project-name=mysite --project-type=drupal10 --docroot=web --php-version=8.2 --webserver-type=nginx-fpm --database=mariadb:10.11 --router-https-port=30001
 
 # Start DDEV
 ddev start

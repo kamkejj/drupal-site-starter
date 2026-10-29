@@ -56,7 +56,7 @@ pub fn project_url(path: &str, name: &str) -> Option<String> {
     json["raw"]["primary_url"].as_str().map(str::to_string)
 }
 
-fn port_free(port: u16) -> bool {
+pub fn port_free(port: u16) -> bool {
     TcpListener::bind(("127.0.0.1", port)).is_ok()
 }
 

@@ -54,6 +54,9 @@ pub struct ProjectInput {
     pub config_sync_dir: String,
     pub export_config_on_install: bool,
     pub init_git: bool,
+    /// Wider than a port so an out-of-range number reaches `parse` and gets a field error.
+    #[serde(default)]
+    pub https_port: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +77,7 @@ pub struct Project {
     pub config_sync_dir: String,
     pub export_config_on_install: bool,
     pub init_git: bool,
+    pub https_port: Option<u16>,
 }
 
 impl Project {
@@ -238,6 +242,15 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
         err("configSyncDir", "Use a relative path that stays inside the project, such as ../config/sync.");
     }
 
+    let https_port = match input.https_port.map(u16::try_from) {
+        None => None,
+        Some(Ok(p)) if p >= 1024 => Some(p),
+        Some(_) => {
+            err("httpsPort", "Use a port from 1024 to 65535, such as 30001.");
+            None
+        }
+    };
+
     match release {
         Some(r) if errors.is_empty() => Ok(Project {
             name: input.name.clone(),
@@ -256,6 +269,7 @@ pub fn parse(input: &ProjectInput, compat: &Compat) -> Result<Project, Vec<Field
             config_sync_dir: sync.to_string(),
             export_config_on_install: input.export_config_on_install,
             init_git: input.init_git,
+            https_port,
         }),
         _ => Err(errors),
     }
@@ -284,6 +298,7 @@ pub(crate) mod tests {
             config_sync_dir: "../config/sync".into(),
             export_config_on_install: true,
             init_git: true,
+            https_port: None,
         }
     }
 
@@ -321,6 +336,19 @@ pub(crate) mod tests {
         let mut i = input(tmp.path());
         i.php = "8.1".into();
         assert_eq!(fields(parse(&i, &Compat::bundled())), vec!["php"]);
+    }
+
+    #[test]
+    fn https_port_is_optional_and_unprivileged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut i = input(tmp.path());
+        assert_eq!(parse(&i, &Compat::bundled()).unwrap().https_port, None);
+        for bad in [80, 65536] {
+            i.https_port = Some(bad);
+            assert_eq!(fields(parse(&i, &Compat::bundled())), ["httpsPort"]);
+        }
+        i.https_port = Some(30001);
+        assert_eq!(parse(&i, &Compat::bundled()).unwrap().https_port, Some(30001));
     }
 
     #[test]

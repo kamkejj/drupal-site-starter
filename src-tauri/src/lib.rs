@@ -247,6 +247,14 @@ async fn project_url(state: State<'_, AppState>, name: String) -> Result<String,
 }
 
 #[tauri::command]
+async fn port_user(state: State<'_, AppState>, port: u16) -> Result<Option<String>, String> {
+    let path = state.exec.path.clone();
+    tauri::async_runtime::spawn_blocking(move || sites::port_user(&sites::list(&path), port))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn list_sites(state: State<'_, AppState>) -> Result<Vec<sites::Site>, String> {
     let path = state.exec.path.clone();
     tauri::async_runtime::spawn_blocking(move || sites::list(&path))
@@ -452,6 +460,7 @@ pub fn run() {
             save_settings,
             preflight,
             existing_projects,
+            port_user,
             list_sites,
             site_action,
             project_url,

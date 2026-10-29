@@ -116,22 +116,21 @@ fn when_custom_code(extensions: &[&str], command: &str) -> String {
 
 pub fn build(p: &Project, compat: &Compat) -> Vec<Step> {
     let r = &p.release;
+    let mut config = vec![
+        "config".to_string(),
+        format!("--project-name={}", p.name),
+        format!("--project-type={}", r.ddev_type),
+        format!("--docroot={DOCROOT}"),
+        format!("--php-version={}", p.php),
+        format!("--webserver-type={}", p.webserver.as_str()),
+        format!("--database={}:{}", p.database.kind.as_str(), p.database.version),
+    ];
+    if let Some(port) = p.https_port {
+        config.push(format!("--router-https-port={port}"));
+    }
     let mut steps = vec![
         step("mkdir", "Create the project folder", Action::CreateProjectDir, MIN),
-        step(
-            "ddev-config",
-            "Configure DDEV",
-            ddev(&[
-                "config",
-                &format!("--project-name={}", p.name),
-                &format!("--project-type={}", r.ddev_type),
-                &format!("--docroot={DOCROOT}"),
-                &format!("--php-version={}", p.php),
-                &format!("--webserver-type={}", p.webserver.as_str()),
-                &format!("--database={}:{}", p.database.kind.as_str(), p.database.version),
-            ]),
-            MIN,
-        ),
+        step("ddev-config", "Configure DDEV", Action::Ddev { args: config, stdin_secret: false }, MIN),
         step("ddev-start", "Start DDEV", ddev(&["start"]), 10 * MIN),
         step(
             "create-project",
@@ -495,6 +494,7 @@ mod tests {
             i.php = "8.2".into();
             i.bundles = vec!["seo".into()];
             i.ci = Ci::Gitlab;
+            i.https_port = Some(30001);
         });
     }
 
