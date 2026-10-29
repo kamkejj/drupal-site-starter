@@ -244,11 +244,11 @@
       {#if presetNote}<span class="text-xs text-[var(--color-warning)]">{presetNote}</span>{/if}
     </div>
   {/if}
-  <ol class="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Site setup progress">
+  <ol class="mb-5 grid grid-cols-2 gap-2 sm:flex" aria-label="Site setup progress">
     {#each STEPS as label, i (label)}
-      <li class="flex-1">
+      <li class="flex-auto">
         <button
-          class="choice-tile min-h-11 w-full px-3 py-2 text-left text-sm {i === stepIndex ? 'is-selected' : ''}"
+          class="choice-tile min-h-11 w-full px-2.5 py-2 text-left text-sm! {i === stepIndex ? 'is-selected' : ''}"
           aria-current={i === stepIndex ? "step" : undefined}
           onclick={() => goTo(i)}>{i + 1}. {label}</button
         >
