@@ -308,6 +308,13 @@ over** (`ddev delete -Oy` plus removing the folder, after confirmation).
   commands. Rust validates every input and spawns only `ddev` (and `git`)
   with argument arrays. Running processes through `tokio::process` skips
   Tauri's shell-plugin allowlist, so this validation is the real boundary.
+  Release builds set a Content Security Policy in `tauri.conf.json`, so a
+  script injected into the UI can't load or run more code. Scripts must come
+  from the app (Tauri adds hashes for its inline ones). Styles allow
+  `'unsafe-inline'` because Svelte and SvelteKit write `style` attributes.
+  `dangerousDisableAssetCspModification` keeps Tauri from adding a nonce to
+  `style-src`, which would make browsers ignore `'unsafe-inline'`. Dev
+  builds have no CSP, since Vite's dev server injects its own scripts.
 - **Little Rust needed:** most of the code is TypeScript.
 
 | Layer                 | Choice                                                   |
