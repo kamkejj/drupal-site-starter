@@ -32,7 +32,7 @@ jobs:
       SMOKE_RECIPES: ${{ matrix.recipes }}
       SMOKE_CI: github
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Tauri's Linux dependencies
         run: |
           sudo apt-get update
