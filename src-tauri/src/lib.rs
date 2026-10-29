@@ -391,7 +391,7 @@ fn resolve_project(state: &AppState, job: &Job) -> Result<Resolved, String> {
     resolve_err(state, job, true)
 }
 
-/// `ddev delete -Oy` plus removing the folder. Refuses to remove a folder that
+/// `ddev delete --omit-snapshot --yes` plus removing the folder. Refuses to remove a folder that
 /// isn't this DDEV project, or one this app's run didn't start, so a wrong
 /// path can't wipe unrelated files.
 #[tauri::command]
@@ -404,7 +404,7 @@ async fn delete_project(app: AppHandle, state: State<'_, AppState>, job: Job) ->
     let made_here = RunState::load(&state_file).completed.iter().any(|id| id == "mkdir" || id == "git-clone");
     if ours {
         let status = tokio::process::Command::new("ddev")
-            .args(["delete", "-Oy", &p.name])
+            .args(["delete", "--omit-snapshot", "--yes", &p.name])
             .env("PATH", &state.exec.path)
             .env("DDEV_NONINTERACTIVE", "true")
             .status()

@@ -83,6 +83,18 @@
     }
   }
 
+  async function deleteSite() {
+    const ok = await ask(`Delete the DDEV project ${name} and remove ${plan?.dir}? No database snapshot is kept.`, {
+      title: "Delete site",
+      kind: "warning",
+    });
+    if (!ok) return;
+    await act(async () => {
+      await api.deleteProject(job);
+      onBack();
+    });
+  }
+
   untrack(() => api.plan(job)).then(
     (p) => {
       plan = p;
@@ -150,6 +162,7 @@
           {/if}
           <button class="btn-primary" onclick={() => act(async () => openUrl(await api.projectUrl(name)))}>Open site</button>
           <button class="btn-ghost" onclick={onBack}>New site</button>
+          <button class="btn-danger" onclick={deleteSite}>Delete site</button>
         {:else}
           {#if failed?.[1].retry.kind !== "startOver"}
             <button class="btn-primary" onclick={() => start(true)}>{phase === "cancelled" ? "Resume" : "Retry"}</button>
