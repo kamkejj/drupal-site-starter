@@ -512,7 +512,7 @@
   </div>
 
   <div class="mt-4 flex justify-between">
-    <button class="btn-ghost" onclick={() => goTo(stepIndex - 1)} disabled={stepIndex === 0}>Back</button>
+    <button class="btn-secondary" onclick={() => goTo(stepIndex - 1)} disabled={stepIndex === 0}>Back</button>
     {#if STEPS[stepIndex] === "Review"}
       <div class="flex items-center gap-3">
         {#if runInProgress}<span class="help text-sm">Another setup is running. Start this one when it finishes.</span>{/if}

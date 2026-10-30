@@ -15,6 +15,7 @@
   --color-divider: #45475a;
   --color-primary: #89b4fa;
   --color-primary-strong: #b4befe;
+  --color-secondary: #94e2d5;
   --color-on-accent: #11111b;
   --color-accent: #cba6f7;
   --color-success: #a6e3a1;
@@ -38,6 +39,7 @@
   --color-divider: #494d64;
   --color-primary: #8aadf4;
   --color-primary-strong: #b7bdf8;
+  --color-secondary: #8bd5ca;
   --color-on-accent: #181926;
   --color-accent: #c6a0f6;
   --color-success: #a6da95;
@@ -61,6 +63,7 @@
   --color-divider: #51576d;
   --color-primary: #8caaee;
   --color-primary-strong: #babbf1;
+  --color-secondary: #81c8be;
   --color-on-accent: #232634;
   --color-accent: #ca9ee6;
   --color-success: #a6d189;
@@ -85,6 +88,7 @@
   --color-divider: #ccd0da;
   --color-primary: color-mix(in oklab, #1e66f5 90%, black);
   --color-primary-strong: color-mix(in oklab, #1e66f5 78%, black);
+  --color-secondary: color-mix(in oklab, #179299 72%, black);
   --color-on-accent: #eff1f5;
   --color-accent: #8839ef;
   --color-success: color-mix(in oklab, #40a02b 75%, black);
@@ -182,6 +186,8 @@ kbd { display: inline-block; min-width: 3rem; border: 1px solid var(--color-bord
 .btn-primary:hover:not(:disabled) { border-color: var(--color-primary-strong); background: var(--color-primary-strong); }
 @utility btn-ghost { @apply btn; border: 1px solid var(--color-border); background: var(--color-panel); color: var(--color-ink); }
 .btn-ghost:hover:not(:disabled) { background: var(--color-recessed); }
+@utility btn-secondary { @apply btn; border: 1px solid var(--color-secondary); background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-panel)); color: var(--color-secondary); }
+.btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--color-secondary) 16%, var(--color-panel)); }
 @utility btn-danger { @apply btn; border: 1px solid var(--color-danger); background: var(--color-danger); color: var(--color-on-accent); }
 .btn-danger:hover:not(:disabled) { border-color: var(--color-danger-strong); background: var(--color-danger-strong); }
 @utility card { border: 1px solid var(--color-divider); border-radius: 1rem; background: var(--color-panel); padding: clamp(1rem, 2.5vw, 1.5rem); box-shadow: 0 1px 2px color-mix(in srgb, var(--color-terminal) 60%, transparent); }

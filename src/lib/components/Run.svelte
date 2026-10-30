@@ -170,7 +170,7 @@
             <button class="btn-primary" onclick={() => start(true)}>{phase === "cancelled" ? "Resume" : "Retry"}</button>
           {/if}
           <button class="btn-danger" onclick={deleteAndStartOver}>Delete and start over</button>
-          <button class="btn-ghost" onclick={onBack}>Back</button>
+          <button class="btn-secondary" onclick={onBack}>Back</button>
         {/if}
       </div>
     </div>
